@@ -134,6 +134,10 @@ export const apiService = {
     const response = await api.put('/persons/me', payload);
     return response.data;
   },
+  deactivateAccount: async () => {
+    const response = await api.post('/persons/me/deactivate');
+    return response.data;
+  },
 
   // Phone Support
   updateProfilePhone: async (phone) => {

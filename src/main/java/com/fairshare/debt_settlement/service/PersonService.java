@@ -102,7 +102,9 @@ public class PersonService {
 
         if (normalizedNumbers.isEmpty()) return getAllPersons();
 
-        List<Person> registered = personRepository.findAllByPhoneNumberIn(normalizedNumbers);
+        List<Person> registered = personRepository.findAllByPhoneNumberIn(normalizedNumbers).stream()
+                .filter(Person::isActive)
+                .collect(java.util.stream.Collectors.toList());
 
         // Only the current user's own collection is touched, so no per-contact lazy load happens.
         java.util.Set<Long> friendIds = currentUser.getFriends().stream()
@@ -149,7 +151,9 @@ public class PersonService {
                 .filter(n -> n != null && !n.isEmpty())
                 .collect(java.util.stream.Collectors.toList());
 
-        List<Person> foundPersons = personRepository.findAllByPhoneNumberIn(normalizedNumbers);
+        List<Person> foundPersons = personRepository.findAllByPhoneNumberIn(normalizedNumbers).stream()
+                .filter(Person::isActive) // a deactivated account isn't "on Settlement" any more
+                .collect(java.util.stream.Collectors.toList());
         java.util.Map<String, Person> phoneToPerson = foundPersons.stream()
                 .collect(java.util.stream.Collectors.toMap(Person::getPhoneNumber, p -> p));
 
@@ -255,11 +259,51 @@ public class PersonService {
         return personRepository.save(me);
     }
 
+    /**
+     * Soft-deactivates the current user, but ONLY once they are square.
+     *
+     * This is what keeps the ledger honest when debts have been simplified. If A owes B and B owes
+     * C, the optimizer collapses that to "A owes C" - B is genuinely net-zero and can leave freely,
+     * while A and C each still carry a real balance and are blocked until they settle. So a debt can
+     * never be left pointing at a departed counterparty, and no money silently appears or vanishes.
+     */
+    @org.springframework.transaction.annotation.Transactional
+    public Person deactivateAccount() {
+        Person me = getCurrentUser();
+
+        double toPay = 0.0;
+        double toReceive = 0.0;
+        for (Debt d : debtRepository.findAllPendingTransactionsForUser(me.getId())) {
+            if (d.getDebtor() != null && d.getDebtor().getId().equals(me.getId())) {
+                toPay += d.getAmount();
+            } else {
+                toReceive += d.getAmount();
+            }
+        }
+
+        if (toPay > 0.01 || toReceive > 0.01) {
+            StringBuilder msg = new StringBuilder("You still have an outstanding balance. ");
+            if (toPay > 0.01) msg.append("You owe ₹").append(fmtAmount(toPay)).append(". ");
+            if (toReceive > 0.01) msg.append("You are owed ₹").append(fmtAmount(toReceive)).append(". ");
+            msg.append("Settle up before deactivating your account.");
+            throw new IllegalArgumentException(msg.toString());
+        }
+
+        me.setActive(false);
+        return personRepository.save(me);
+    }
+
+    private String fmtAmount(double amount) {
+        if (amount == Math.rint(amount)) return String.valueOf((long) amount);
+        return String.valueOf(Math.round(amount * 100.0) / 100.0);
+    }
+
     public List<Person> getAllPersons() {
         Person currentUser = getCurrentUser();
         // Exclude the current user themselves if they happen to be in the set
         List<Person> friends = new ArrayList<>(currentUser.getFriends());
         friends.removeIf(p -> p.getId().equals(currentUser.getId()));
+        friends.removeIf(p -> !p.isActive()); // deactivated people drop out of everyone's Circle
         // Return masked COPIES so a friend's hidden phone/email is never exposed to others.
         // (Copies, not managed entities, so nothing is accidentally persisted.)
         List<Person> masked = new ArrayList<>();

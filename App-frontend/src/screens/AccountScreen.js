@@ -26,7 +26,7 @@ const inviteMessageFor = (group) =>
 
 const AccountScreen = () => {
   const {
-    user, groups, gamification, logout, updateMyProfile,
+    user, groups, gamification, logout, updateMyProfile, deactivateAccount,
     createGroup, joinGroup, leaveGroup, fetchData, isLoading,
   } = useStore();
 
@@ -114,6 +114,32 @@ const AccountScreen = () => {
       { text: 'Cancel', style: 'cancel' },
       { text: 'Log out', style: 'destructive', onPress: () => logout() },
     ]);
+  };
+
+  const handleDeactivate = () => {
+    Alert.alert(
+      'Deactivate account?',
+      "You won't be able to sign in again, and you'll disappear from your friends' Circle. "
+        + 'Your settled history is kept. You can only do this once all your balances are settled.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Deactivate',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await deactivateAccount(); // logs out on success
+            } catch (e) {
+              // Most often: "You still have an outstanding balance..." - show it as-is.
+              Alert.alert(
+                'Cannot deactivate yet',
+                e.response?.data?.message || 'Could not deactivate your account. Please try again.'
+              );
+            }
+          },
+        },
+      ]
+    );
   };
 
   const progress = gamification?.progressPercent ?? 0;
@@ -270,6 +296,10 @@ const AccountScreen = () => {
           <Text style={styles.logoutText}>Log out</Text>
         </TouchableOpacity>
 
+        <TouchableOpacity style={styles.deactivateBtn} onPress={handleDeactivate}>
+          <Text style={styles.deactivateText}>Deactivate account</Text>
+        </TouchableOpacity>
+
         <View style={{ height: 40 }} />
       </ScrollView>
 
@@ -397,6 +427,11 @@ const styles = StyleSheet.create({
     backgroundColor: Theme.colors.danger + '08',
   },
   logoutText: { color: Theme.colors.danger, fontWeight: '800', fontSize: 15 },
+  deactivateBtn: { alignItems: 'center', paddingVertical: Theme.spacing.md, marginTop: Theme.spacing.xs },
+  deactivateText: {
+    color: Theme.colors.textSecondary, fontWeight: '600', fontSize: 13,
+    textDecorationLine: 'underline',
+  },
 
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
   modalContent: { backgroundColor: Theme.colors.white, borderTopLeftRadius: 30, borderTopRightRadius: 30, padding: Theme.spacing.xl, paddingBottom: 40 },

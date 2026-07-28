@@ -63,6 +63,12 @@ public class PersonController {
                 request.getHidePhone(), request.getHideEmail(), request.getNotificationsEnabled()));
     }
 
+    // POST /api/persons/me/deactivate - refused while any balance is still outstanding
+    @PostMapping("/me/deactivate")
+    public ResponseEntity<Person> deactivateMyAccount() {
+        return ResponseEntity.ok(personService.deactivateAccount());
+    }
+
     // POST /api/persons/check-contacts
     @PostMapping("/check-contacts")
     public ResponseEntity<List<java.util.Map<String, Object>>> checkBatchContacts(@RequestBody List<String> phoneNumbers) {

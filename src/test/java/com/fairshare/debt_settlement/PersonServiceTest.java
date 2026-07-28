@@ -1,5 +1,6 @@
 package com.fairshare.debt_settlement;
 
+import com.fairshare.debt_settlement.model.Debt;
 import com.fairshare.debt_settlement.model.Group;
 import com.fairshare.debt_settlement.model.Person;
 import com.fairshare.debt_settlement.repository.DebtRepository;
@@ -111,6 +112,78 @@ class PersonServiceTest {
 
         assertThat(me.getFriends()).isEmpty();
         verify(personRepository, never()).addReverseFriendships(any(), any());
+    }
+
+    // ---- account deactivation ----
+
+    private Debt pendingDebt(Person debtor, Person creditor, double amount) {
+        Debt d = new Debt();
+        d.setDebtor(debtor);
+        d.setCreditor(creditor);
+        d.setAmount(amount);
+        d.setStatus("PENDING");
+        return d;
+    }
+
+    @Test
+    void deactivate_whenSquare_softDeactivatesAndKeepsTheRow() {
+        when(debtRepository.findAllPendingTransactionsForUser(1L)).thenReturn(List.of());
+
+        Person result = personService.deactivateAccount();
+
+        assertThat(result.isActive()).isFalse();
+        verify(personRepository).save(me);          // soft: the row is kept, not deleted
+        verify(personRepository, never()).delete(any());
+    }
+
+    @Test
+    void deactivate_whenYouStillOweMoney_isBlockedWithTheAmount() {
+        Person other = person(2L, "Other", "other@example.com", "9000000001");
+        when(debtRepository.findAllPendingTransactionsForUser(1L))
+                .thenReturn(List.of(pendingDebt(me, other, 10.0)));
+
+        assertThatThrownBy(() -> personService.deactivateAccount())
+                .isExactlyInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("You owe ₹10");
+
+        assertThat(me.isActive()).isTrue();
+    }
+
+    @Test
+    void deactivate_whenYouAreStillOwedMoney_isBlocked() {
+        // This is the client's A -> B -> C case from C's side: after the chain collapses to
+        // "A owes C", C is still owed and must not be able to walk away and strand that debt.
+        Person a = person(2L, "A", "a@example.com", "9000000001");
+        when(debtRepository.findAllPendingTransactionsForUser(1L))
+                .thenReturn(List.of(pendingDebt(a, me, 10.0)));
+
+        assertThatThrownBy(() -> personService.deactivateAccount())
+                .isExactlyInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("You are owed ₹10");
+
+        assertThat(me.isActive()).isTrue();
+    }
+
+    @Test
+    void deactivate_middlemanWhoNettedToZeroCanLeaveFreely() {
+        // ...and the same case from B's side: B owed A and was owed by C, so after simplification
+        // B holds no pending debt at all and is free to go.
+        when(debtRepository.findAllPendingTransactionsForUser(1L)).thenReturn(List.of());
+
+        assertThat(personService.deactivateAccount().isActive()).isFalse();
+    }
+
+    @Test
+    void deactivatedPeopleDisappearFromYourCircle() {
+        Person active = person(2L, "Active", "active@example.com", "9000000001");
+        Person gone = person(3L, "Gone", "gone@example.com", "9000000002");
+        gone.setActive(false);
+        me.getFriends().add(active);
+        me.getFriends().add(gone);
+
+        assertThat(personService.getAllPersons())
+                .extracting(Person::getName)
+                .containsExactly("Active");
     }
 
     @Test

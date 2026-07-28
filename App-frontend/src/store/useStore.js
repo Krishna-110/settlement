@@ -256,6 +256,13 @@ export const useStore = create((set, get) => ({
     return user;
   },
 
+  // Deactivate: the backend refuses while any balance is outstanding, so a rejection here
+  // is expected and its message is worth showing verbatim.
+  deactivateAccount: async () => {
+    await apiService.deactivateAccount();
+    await get().logout();
+  },
+
   updateDebt: async (id, debtData) => {
     try {
       const updatedDebt = await apiService.updateDebt(id, debtData);

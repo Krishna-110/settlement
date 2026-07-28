@@ -48,6 +48,12 @@ public class Person {
     @ColumnDefault("true")
     private boolean notificationsEnabled = true;
 
+    // Soft deactivation: the row (and therefore all settled history) is kept, but the person can no
+    // longer sign in and stops appearing to others as someone to add or transact with.
+    @Column(nullable = false)
+    @ColumnDefault("true")
+    private boolean active = true;
+
     @ManyToMany
     @JoinTable(
         name = "person_friends",
