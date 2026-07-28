@@ -11,9 +11,18 @@ import {
   LogOut, Pencil, QrCode, Share2, Trophy, Flame, Lock, Plus, LogIn, Users, ChevronRight,
 } from 'lucide-react-native';
 
-const APP_LINK = 'https://cleardues.app';
-const inviteLinkFor = (group) => `${APP_LINK}/join?code=${group.joinCode}`;
-const qrUrl = (data) => `https://api.qrserver.com/v1/create-qr-code/?size=220x220&margin=8&data=${encodeURIComponent(data)}`;
+import { APP_WEBSITE, joinGroupLink, qrImageUrl } from '../config/links';
+
+const inviteLinkFor = (group) => joinGroupLink(group.joinCode);
+const qrUrl = qrImageUrl;
+
+// The code is spelled out as the primary instruction: a custom-scheme link isn't always
+// tappable in every messaging app, so the code must always work on its own.
+const inviteMessageFor = (group) =>
+  `Join my group "${group.name}" on Settlement!\n\n` +
+  `Group code: ${group.joinCode}\n\n` +
+  `Tap to join: ${inviteLinkFor(group)}\n\n` +
+  `Don't have the app yet? ${APP_WEBSITE}`;
 
 const AccountScreen = () => {
   const {
@@ -87,12 +96,11 @@ const AccountScreen = () => {
   };
 
   const inviteWhatsApp = (group) => {
-    const msg = `Join my group "${group.name}" on Settlement! Use code ${group.joinCode} or tap ${inviteLinkFor(group)}`;
-    Linking.openURL(`https://wa.me/?text=${encodeURIComponent(msg)}`).catch(() =>
+    Linking.openURL(`https://wa.me/?text=${encodeURIComponent(inviteMessageFor(group))}`).catch(() =>
       Alert.alert('WhatsApp not available', 'Could not open WhatsApp on this device.'));
   };
   const shareCode = (group) => {
-    Share.share({ message: `Join my group "${group.name}" on Settlement — code ${group.joinCode}. ${inviteLinkFor(group)}` });
+    Share.share({ message: inviteMessageFor(group) });
   };
   const confirmLeave = (group) => {
     Alert.alert('Leave group?', `Leave "${group.name}"?`, [

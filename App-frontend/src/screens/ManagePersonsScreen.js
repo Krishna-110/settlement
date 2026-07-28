@@ -6,6 +6,7 @@ import { Theme } from '../theme/Theme';
 import { Users, Trash2, Plus, X, RefreshCw, CheckCircle2, UserPlus, Search } from 'lucide-react-native';
 import { getDeviceContacts, normalizePhoneNumber } from '../services/ContactService';
 import apiService from '../services/apiService';
+import { APP_WEBSITE } from '../config/links';
 
 // Ordering for the Contacts tab: people already on the app come first (the ones you can actually
 // transact with), then those you've already added, then everyone else - each alphabetical.
@@ -126,7 +127,7 @@ const ManagePersonsScreen = () => {
   };
 
   const inviteContact = (contact) => {
-    const message = `Hey ${contact.name}! Join me on Settlement to track and settle our shared expenses easily. Download here: https://cleardues.app`;
+    const message = `Hey ${contact.name}! Join me on Settlement to track and settle our shared expenses easily. Download here: ${APP_WEBSITE}`;
     const url = `sms:${contact.phoneNumber}${Platform.OS === 'ios' ? '&' : '?'}body=${encodeURIComponent(message)}`;
     Linking.openURL(url);
   };

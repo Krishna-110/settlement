@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, ActivityIndicator, StyleSheet } from 'react-native';
+import { View, ActivityIndicator, StyleSheet, Alert } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
@@ -75,7 +75,10 @@ const LoadingScreen = () => (
 );
 
 export default function App() {
-  const { setAuthenticated, checkAuth, isAuthenticated } = useStore();
+  const {
+    setAuthenticated, checkAuth, isAuthenticated,
+    pendingJoinCode, setPendingJoinCode, joinGroup,
+  } = useStore();
   const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
@@ -86,18 +89,26 @@ export default function App() {
     };
     init();
 
-    // 2. Handle Deep Linking for OAuth2 Redirects
+    // 2. Handle incoming deep links: the OAuth2 redirect, and group invites.
     const handleDeepLink = (event) => {
       const { url } = event;
-      if (url) {
-        try {
-          const { queryParams } = Linking.parse(url);
-          if (queryParams && queryParams.token) {
-            setAuthenticated(queryParams.token);
-          }
-        } catch (error) {
-          console.error('Deep link parse error', error);
+      if (!url) return;
+      try {
+        const { queryParams } = Linking.parse(url);
+
+        // cleardues://--/login-success?token=...
+        if (queryParams && queryParams.token) {
+          setAuthenticated(queryParams.token);
+          return;
         }
+
+        // settlement://join?code=ABC123 - stash it; joining needs a signed-in user, and the
+        // link often arrives before login (or with the app closed entirely).
+        if (queryParams && queryParams.code) {
+          setPendingJoinCode(String(queryParams.code).trim().toUpperCase());
+        }
+      } catch (error) {
+        console.error('Deep link parse error', error);
       }
     };
 
@@ -112,6 +123,32 @@ export default function App() {
       subscription.remove();
     };
   }, []);
+
+  // 3. Once signed in, redeem any invite code that came in from a deep link.
+  useEffect(() => {
+    if (!isAuthenticated || !pendingJoinCode) return;
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const group = await joinGroup(pendingJoinCode);
+        if (!cancelled) {
+          Alert.alert('Group joined', `You're now a member of "${group?.name || 'the group'}".`);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          Alert.alert(
+            'Could not join group',
+            err.response?.data?.message || 'That invite code is not valid anymore.'
+          );
+        }
+      } finally {
+        if (!cancelled) setPendingJoinCode(null);
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [isAuthenticated, pendingJoinCode]);
 
   if (!isReady) {
     return <LoadingScreen />;

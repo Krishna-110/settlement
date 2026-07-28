@@ -14,6 +14,9 @@ export const useStore = create((set, get) => ({
   // instead of re-reading the whole address book and re-hitting the network.
   deviceContacts: [],
   lastContactSyncAt: null,
+  // Group invite code captured from a deep link, held until the user is signed in
+  // (joining requires a JWT, and the link may well arrive while logged out).
+  pendingJoinCode: null,
   user: null,
   isAuthenticated: false,
   isLoading: false,
@@ -50,6 +53,7 @@ export const useStore = create((set, get) => ({
       gamification: null,
       deviceContacts: [],
       lastContactSyncAt: null,
+      pendingJoinCode: null,
       error: null
     });
   },
@@ -201,6 +205,8 @@ export const useStore = create((set, get) => ({
     ]);
     set({ debts, settlements, notifications });
   },
+
+  setPendingJoinCode: (code) => set({ pendingJoinCode: code }),
 
   // Device contacts (cached between visits to the Circle > Contacts tab)
   setDeviceContacts: (contacts) =>
