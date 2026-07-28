@@ -48,7 +48,7 @@ public class DebtController {
 
     @GetMapping
     public ResponseEntity<List<Debt>> getAllDebts() {
-        return ResponseEntity.ok(debtService.getAllDebts());
+        return ResponseEntity.ok(debtService.getAllDebts(currentUserEmail()));
     }
 
     @PutMapping("/{id}")

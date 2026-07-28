@@ -345,6 +345,19 @@ public class DebtService {
         }
     }
 
+    /**
+     * The caller's own transactions only. This endpoint previously returned every debt in the
+     * system to every user (the client then filtered locally) - both a needless payload/scan and
+     * an exposure of other people's records.
+     */
+    public List<Debt> getAllDebts(String userEmail) {
+        if (userEmail == null) return debtRepository.findAll();
+        return personRepository.findByEmail(userEmail)
+                .map(p -> debtRepository.findAllTransactionsForUser(p.getId()))
+                .orElseGet(java.util.List::of);
+    }
+
+    // Unscoped view, used internally (e.g. the settlement engine needs the global picture).
     public List<Debt> getAllDebts() {
         return debtRepository.findAll();
     }

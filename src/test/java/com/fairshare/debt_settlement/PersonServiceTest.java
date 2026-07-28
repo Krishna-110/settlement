@@ -75,6 +75,44 @@ class PersonServiceTest {
         return p;
     }
 
+    private com.fairshare.debt_settlement.dto.CreatePersonRequest contact(String phone) {
+        com.fairshare.debt_settlement.dto.CreatePersonRequest r =
+                new com.fairshare.debt_settlement.dto.CreatePersonRequest();
+        r.setPhoneNumber(phone);
+        r.setName("Contact " + phone);
+        return r;
+    }
+
+    @Test
+    void syncContactsBatch_resolvesAllNumbersInOneQuery_notOnePerContact() {
+        Person a = person(2L, "A", "a@example.com", "9000000001");
+        Person b = person(3L, "B", "b@example.com", "9000000002");
+        when(personRepository.findAllByPhoneNumberIn(any())).thenReturn(List.of(a, b));
+
+        // 9000000003 isn't registered, and 9000000001 is repeated to prove de-duplication.
+        personService.syncContactsBatch(List.of(
+                contact("9000000001"), contact("9000000002"),
+                contact("9000000003"), contact("9000000001")));
+
+        // One batched lookup for the whole address book...
+        verify(personRepository, times(1)).findAllByPhoneNumberIn(any());
+        // ...and never the old per-contact query (that was the N+1).
+        verify(personRepository, never()).findByPhoneNumber(anyString());
+        // Both registered contacts are auto-befriended, mirrored in a single bulk statement.
+        assertThat(me.getFriends()).contains(a, b);
+        verify(personRepository, times(1)).addReverseFriendships(eq(1L), any());
+    }
+
+    @Test
+    void syncContactsBatch_whenNobodyIsRegistered_writesNothing() {
+        when(personRepository.findAllByPhoneNumberIn(any())).thenReturn(List.of());
+
+        personService.syncContactsBatch(List.of(contact("9000000009")));
+
+        assertThat(me.getFriends()).isEmpty();
+        verify(personRepository, never()).addReverseFriendships(any(), any());
+    }
+
     @Test
     void updateMyPhone_invalidFormat_throwsIllegalArgumentNotRuntimeException() {
         assertThatThrownBy(() -> personService.updateMyPhone("123"))

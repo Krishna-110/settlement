@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput, Modal, Alert, ActivityIndicator, KeyboardAvoidingView, Platform, Linking } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useStore } from '../store/useStore';
@@ -7,15 +7,31 @@ import { Users, Trash2, Plus, X, RefreshCw, CheckCircle2, UserPlus, Search } fro
 import { getDeviceContacts, normalizePhoneNumber } from '../services/ContactService';
 import apiService from '../services/apiService';
 
+// Ordering for the Contacts tab: people already on the app come first (the ones you can actually
+// transact with), then those you've already added, then everyone else - each alphabetical.
+const contactRank = (c) => {
+  if (c.registered && !c.isFriend) return 0;
+  if (c.registered) return 1;
+  return 2;
+};
+const byRankThenName = (a, b) => {
+  const rank = contactRank(a) - contactRank(b);
+  if (rank !== 0) return rank;
+  return (a.name || '').localeCompare(b.name || '');
+};
+
 const ManagePersonsScreen = () => {
-  const { persons, fetchData, addPerson, deletePerson, isLoading, user } = useStore();
+  const {
+    persons, fetchData, addPerson, deletePerson, isLoading, user,
+    deviceContacts, lastContactSyncAt, setDeviceContacts,
+    markContactAsFriend, markContactAsNotFriend,
+  } = useStore();
   const [modalVisible, setModalVisible] = useState(false);
   const [newName, setNewName] = useState('');
   const [newPhone, setNewPhone] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [validationMsg, setValidationMsg] = useState(null);
-  
-  const [deviceContacts, setDeviceContacts] = useState([]);
+
   const [isSyncing, setIsSyncing] = useState(false);
   const [viewMode, setViewMode] = useState('friends'); // 'friends' or 'contacts'
   const [searchQuery, setSearchQuery] = useState('');
@@ -41,7 +57,7 @@ const ManagePersonsScreen = () => {
       } else {
         setValidationMsg(null);
       }
-    }, 500);
+    }, 800); // only fires once the user actually pauses typing
 
     return () => clearTimeout(delayDebounceFn);
   }, [newPhone]);
@@ -86,20 +102,18 @@ const ManagePersonsScreen = () => {
             backendName: regInfo?.name,
             isFriend: friendsPhoneSet.has(c.phoneNumber)
           };
-        }).sort((a, b) => {
-          // Sort: Registered (not friends) first, then others
-          if (a.registered && !a.isFriend) return -1;
-          if (b.registered && !b.isFriend) return 1;
-          return 0;
-        });
+        }).sort(byRankThenName);
 
         setDeviceContacts(enrichedContacts);
         await fetchData(); // Refresh friends list
-        
+
         setViewMode('contacts');
-        if (registeredContacts.length > 0) {
-          Alert.alert('Sync Complete', `Found and added ${registeredContacts.length} friends who are already on Settlement!`);
-        }
+        Alert.alert(
+          'Sync Complete',
+          registeredContacts.length > 0
+            ? `Added ${registeredContacts.length} ${registeredContacts.length === 1 ? 'contact' : 'contacts'} already on Settlement to your Circle automatically.`
+            : 'None of your contacts are on Settlement yet. Invite them from the Contacts tab!'
+        );
       } else {
         Alert.alert('No Contacts', 'No valid contacts with phone numbers found.');
       }
@@ -124,10 +138,7 @@ const ManagePersonsScreen = () => {
         name: contact.backendName || contact.name, 
         phoneNumber: contact.phoneNumber 
       });
-      // Mark as friend locally
-      setDeviceContacts(prev => prev.map(c => 
-        c.phoneNumber === contact.phoneNumber ? { ...c, isFriend: true } : c
-      ));
+      markContactAsFriend(contact.phoneNumber);
       await fetchData();
     } catch (error) {
       Alert.alert('Error', 'Failed to add friend.');
@@ -168,9 +179,7 @@ const ManagePersonsScreen = () => {
              await deletePerson(id);
              // Match by phone (a stable identifier), not display name - a friend can be added
              // under a custom name different from their real account name.
-             setDeviceContacts(prev => prev.map(c =>
-               c.phoneNumber === phoneNumber ? { ...c, isFriend: false } : c
-             ));
+             markContactAsNotFriend(phoneNumber);
           }
         }
       ]
@@ -182,15 +191,25 @@ const ManagePersonsScreen = () => {
     return name.charAt(0).toUpperCase();
   };
 
-  const filteredData = (viewMode === 'friends' ? persons : deviceContacts).filter(item => {
-    if (!searchQuery.trim()) return true;
+  // Opening the Contacts tab shows the cached list instantly; it only syncs the very first time.
+  // (Previously every tab tap re-read the whole address book and re-hit the network.)
+  const openContactsTab = () => {
+    setViewMode('contacts');
+    setSearchQuery('');
+    if (!lastContactSyncAt && !isSyncing) handleSyncContacts();
+  };
+
+  // Memoized: this list can be thousands of rows and was recomputed on every keystroke/render.
+  const filteredData = useMemo(() => {
+    const source = viewMode === 'friends' ? persons : deviceContacts;
     const query = searchQuery.trim().toLowerCase();
-    return (
+    if (!query) return source;
+    return source.filter(item =>
       item?.name?.toLowerCase().includes(query) ||
       item?.phoneNumber?.toLowerCase().includes(query) ||
       item?.email?.toLowerCase().includes(query)
     );
-  });
+  }, [viewMode, persons, deviceContacts, searchQuery]);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -227,9 +246,9 @@ const ManagePersonsScreen = () => {
         >
           <Text style={[styles.tabText, viewMode === 'friends' && styles.activeTabText]}>My Friends</Text>
         </TouchableOpacity>
-        <TouchableOpacity 
-          style={[styles.tab, viewMode === 'contacts' && styles.activeTab]} 
-          onPress={handleSyncContacts}
+        <TouchableOpacity
+          style={[styles.tab, viewMode === 'contacts' && styles.activeTab]}
+          onPress={openContactsTab}
         >
           <Text style={[styles.tabText, viewMode === 'contacts' && styles.activeTabText]}>Contacts</Text>
         </TouchableOpacity>
@@ -297,6 +316,11 @@ const ManagePersonsScreen = () => {
           </View>
         )}
         contentContainerStyle={styles.list}
+        // Windowing matters here - the contacts list can be thousands of rows.
+        initialNumToRender={15}
+        maxToRenderPerBatch={15}
+        windowSize={10}
+        removeClippedSubviews
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
             {isLoading || isSyncing ? (

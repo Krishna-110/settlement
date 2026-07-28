@@ -21,4 +21,20 @@ public interface PersonRepository extends JpaRepository<Person, Long> {
     @org.springframework.data.jpa.repository.Query(value = "DELETE FROM person_friends WHERE person_id = :personId OR friend_id = :personId", nativeQuery = true)
     void removeAllFriendships(@org.springframework.data.repository.query.Param("personId") Long personId);
 
+    /**
+     * Mirrors a batch of friendships back towards the given user in ONE statement.
+     * person_friends stores both directions, and loading each friend's lazy getFriends()
+     * collection just to add one row was the main cost of a contact sync.
+     */
+    @org.springframework.data.jpa.repository.Modifying(clearAutomatically = true)
+    @org.springframework.data.jpa.repository.Query(value =
+            "INSERT INTO person_friends (person_id, friend_id) " +
+            "SELECT p.id, :userId FROM persons p " +
+            "WHERE p.id IN (:friendIds) " +
+            "AND NOT EXISTS (SELECT 1 FROM person_friends pf " +
+            "                WHERE pf.person_id = p.id AND pf.friend_id = :userId)",
+            nativeQuery = true)
+    void addReverseFriendships(@org.springframework.data.repository.query.Param("userId") Long userId,
+                               @org.springframework.data.repository.query.Param("friendIds") java.util.Collection<Long> friendIds);
+
 }

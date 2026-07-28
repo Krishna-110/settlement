@@ -10,6 +10,10 @@ export const useStore = create((set, get) => ({
   notifications: [],
   groups: [],
   gamification: null,
+  // Cached result of the last device-contact sync, so revisiting the Contacts tab is instant
+  // instead of re-reading the whole address book and re-hitting the network.
+  deviceContacts: [],
+  lastContactSyncAt: null,
   user: null,
   isAuthenticated: false,
   isLoading: false,
@@ -44,6 +48,8 @@ export const useStore = create((set, get) => ({
       notifications: [],
       groups: [],
       gamification: null,
+      deviceContacts: [],
+      lastContactSyncAt: null,
       error: null
     });
   },
@@ -195,6 +201,24 @@ export const useStore = create((set, get) => ({
     ]);
     set({ debts, settlements, notifications });
   },
+
+  // Device contacts (cached between visits to the Circle > Contacts tab)
+  setDeviceContacts: (contacts) =>
+    set({ deviceContacts: contacts, lastContactSyncAt: Date.now() }),
+
+  markContactAsFriend: (phoneNumber) =>
+    set((state) => ({
+      deviceContacts: state.deviceContacts.map((c) =>
+        c.phoneNumber === phoneNumber ? { ...c, isFriend: true } : c
+      ),
+    })),
+
+  markContactAsNotFriend: (phoneNumber) =>
+    set((state) => ({
+      deviceContacts: state.deviceContacts.map((c) =>
+        c.phoneNumber === phoneNumber ? { ...c, isFriend: false } : c
+      ),
+    })),
 
   // Groups
   createGroup: async (name) => {

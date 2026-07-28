@@ -81,32 +81,48 @@ public class PersonService {
         return friendToAdd;
     }
 
+    /**
+     * Auto-befriends every contact in the batch that is already registered. Unregistered numbers are
+     * skipped (no placeholder is created).
+     *
+     * Performance: this used to run one findByPhoneNumber per contact AND touch each friend's lazy
+     * getFriends() collection, i.e. ~2 queries per contact. It now does a single batched lookup and
+     * a single bulk insert for the reverse direction, regardless of batch size.
+     */
     @org.springframework.transaction.annotation.Transactional
     public List<Person> syncContactsBatch(List<CreatePersonRequest> contacts) {
         Person currentUser = getCurrentUser();
-        java.util.Set<String> processedNumbers = new java.util.HashSet<>();
 
-        for (CreatePersonRequest contact : contacts) {
-            String normalizedPhone = normalizePhoneNumber(contact.getPhoneNumber());
-            if (normalizedPhone == null || normalizedPhone.isEmpty()) continue;
-            
-            // Avoid processing the same number twice in one batch to prevent unique constraint errors
-            if (processedNumbers.contains(normalizedPhone)) continue; 
-            processedNumbers.add(normalizedPhone);
+        // Normalize + dedupe once, then resolve every number in ONE query.
+        List<String> normalizedNumbers = contacts.stream()
+                .map(c -> normalizePhoneNumber(c.getPhoneNumber()))
+                .filter(p -> p != null && !p.isEmpty())
+                .distinct()
+                .collect(java.util.stream.Collectors.toList());
 
-            Person friendToAdd;
-            Optional<Person> existingPerson = personRepository.findByPhoneNumber(normalizedPhone);
-            
-            if (existingPerson.isPresent()) {
-                friendToAdd = existingPerson.get();
-                establishMutualFriendship(currentUser, friendToAdd);
-            }
-            // Skip unregistered contacts - we don't auto-add them as friends anymore
+        if (normalizedNumbers.isEmpty()) return getAllPersons();
+
+        List<Person> registered = personRepository.findAllByPhoneNumberIn(normalizedNumbers);
+
+        // Only the current user's own collection is touched, so no per-contact lazy load happens.
+        java.util.Set<Long> friendIds = currentUser.getFriends().stream()
+                .map(Person::getId)
+                .collect(java.util.stream.Collectors.toCollection(java.util.HashSet::new));
+
+        List<Long> newFriendIds = new ArrayList<>();
+        for (Person candidate : registered) {
+            if (candidate.getId() == null || candidate.getId().equals(currentUser.getId())) continue;
+            if (!friendIds.add(candidate.getId())) continue; // already a friend
+            currentUser.getFriends().add(candidate);
+            newFriendIds.add(candidate.getId());
         }
-        
-        if (currentUser != null) {
+
+        if (!newFriendIds.isEmpty()) {
             personRepository.save(currentUser);
+            personRepository.flush(); // persist this side before the bulk mirror insert
+            personRepository.addReverseFriendships(currentUser.getId(), newFriendIds);
         }
+
         return getAllPersons();
     }
 
@@ -248,6 +264,9 @@ public class PersonService {
         // (Copies, not managed entities, so nothing is accidentally persisted.)
         List<Person> masked = new ArrayList<>();
         for (Person p : friends) masked.add(maskedCopy(p));
+        // friends is a HashSet, so without this the order is arbitrary and changes between calls.
+        masked.sort(java.util.Comparator.comparing(
+                Person::getName, java.util.Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER)));
         return masked;
     }
 

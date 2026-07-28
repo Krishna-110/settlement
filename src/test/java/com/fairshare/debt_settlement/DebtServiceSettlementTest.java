@@ -233,6 +233,21 @@ class DebtServiceSettlementTest {
         assertThat(db).allMatch(d -> "SETTLED".equals(d.getStatus()));
     }
 
+    // ---- debt listing is scoped to the caller ----
+
+    @Test
+    void getAllDebts_returnsOnlyTheCallersOwnTransactions() {
+        when(personRepository.findByEmail("a@example.com")).thenReturn(Optional.of(a));
+        Debt mine = seedPending(300L, a, b, 100.0);
+        when(debtRepository.findAllTransactionsForUser(1L)).thenReturn(List.of(mine));
+
+        List<Debt> result = debtService.getAllDebts("a@example.com");
+
+        assertThat(result).containsExactly(mine);
+        // Must never fall back to handing out every debt in the system.
+        verify(debtRepository, never()).findAll();
+    }
+
     // ---- decline ----
 
     @Test
