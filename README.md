@@ -13,7 +13,9 @@ A production-grade Spring Boot REST API built to track and settle shared expense
 * **Language:** Java 17+
 * **Framework:** Spring Boot 3.x
 * **Security:** Spring Security, OAuth2 Client, JSON Web Tokens (JJWT 0.12.x)
-* **Database:** MySQL, Spring Data JPA, Hibernate
+* **Database:** **PostgreSQL** (production, hosted on Render), Spring Data JPA, Hibernate.
+  A MySQL driver is also bundled purely as a local-development convenience fallback (see
+  Local Development below) - **production always runs on PostgreSQL.**
 
 ### Frontend (Mobile App)
 * **Framework:** React Native with Expo (SDK 54) for cross-platform Android/iOS support.
@@ -29,17 +31,22 @@ A production-grade Spring Boot REST API built to track and settle shared expense
 This backend implements a custom authentication bridge designed for native mobile applications:
 1. Mobile app redirects the user to the Spring Boot Google OAuth2 endpoint.
 2. User authenticates with Google.
-3. Spring Security intercepts the success response and provisions a new user in the MySQL database.
+3. Spring Security intercepts the success response and provisions a new user in the database.
 4. The `JwtService` mathematically signs a stateless JWT.
-5. A custom `OAuth2LoginSuccessHandler` builds a deep link (`cleardues://login-success?token=...`) and redirects the user back to the mobile app with the token securely attached.
+5. A custom `OAuth2LoginSuccessHandler` builds a deep link (`cleardues://--/login-success?token=...`) and redirects the user back to the mobile app with the token securely attached.
 
 ## 🚀 Deployment
-### Backend (Railway)
-This project is configured for one-click deployment on Railway:
-1. Provision a **MySQL** instance.
-2. Connect your GitHub repository.
-3. Map environment variables (JWT_SECRET, GOOGLE_CLIENT_ID, etc.).
-4. The API will be live on a public `.up.railway.app` domain.
+### Backend (Render)
+This project is deployed on **Render**:
+1. Provision a **PostgreSQL** instance on Render (production database - required).
+2. Connect your GitHub repository as a Web Service.
+3. Set the environment variables: `SPRING_DATASOURCE_URL` (in the form
+   `jdbc:postgresql://<host>:5432/<database>`), `SPRING_DATASOURCE_USERNAME`,
+   `SPRING_DATASOURCE_PASSWORD`, `JWT_SECRET`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`,
+   `FRONTEND_REDIRECT_URI`, and the Vonage SMS variables if SMS is used.
+4. The API will be live on your Render service's `.onrender.com` domain.
+5. `spring.jpa.hibernate.ddl-auto=update` creates/updates all tables automatically on boot -
+   no manual migration step is needed.
 
 ### Frontend (EAS Build)
 Generate the production APK using Expo Application Services:
@@ -52,11 +59,13 @@ Generate the production APK using Expo Application Services:
 ## 🛠️ Local Development
 ### Prerequisites
 * Java 17 or higher
-* MySQL running locally or via Docker
+* PostgreSQL running locally or via Docker (matches production). A MySQL fallback is also
+  wired up in `application.properties` purely for local convenience if that's easier to run
+  on your machine - either works locally, but **production is PostgreSQL only.**
 * A Google Cloud Console project with OAuth2 Credentials
 
 ### 1. Clone the Repository
 ```bash
-git clone https://github.com/Krishna-110/Clear-Dues.git
-cd Clear-Dues
+git clone https://github.com/Krishna-110/settlement.git
+cd settlement
 ```
