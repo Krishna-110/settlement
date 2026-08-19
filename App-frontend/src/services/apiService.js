@@ -1,8 +1,9 @@
 import axios from 'axios';
 import authStorage from '../utils/authStorage';
 
-// BACKEND_URL provided by the user
-const BACKEND_URL = 'https://clear-dues.onrender.com';
+// Backend host. Override at build time with EXPO_PUBLIC_BACKEND_URL to point a build at a
+// different server (e.g. the old Render instance) without editing this file.
+const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://settlementapi.ssbpgc.com';
 const API_BASE_URL = `${BACKEND_URL}/api`;
 
 const api = axios.create({
