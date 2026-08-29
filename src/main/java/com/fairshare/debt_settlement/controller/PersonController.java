@@ -10,7 +10,6 @@ import java.util.List;
 
 @RestController // Tells Spring this class handles web requests and returns JSON
 @RequestMapping("/api/persons") // The base URL for all methods in this class
-@CrossOrigin(origins = "*") // Allows your Flutter app to call this API without CORS errors
 public class PersonController {
 
     private final PersonService personService;

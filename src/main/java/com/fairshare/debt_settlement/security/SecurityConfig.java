@@ -1,5 +1,6 @@
 package com.fairshare.debt_settlement.security;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -10,6 +11,12 @@ import org.springframework.security.oauth2.client.web.DefaultOAuth2Authorization
 import org.springframework.security.oauth2.client.web.OAuth2AuthorizationRequestResolver;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+
+import java.util.Arrays;
+import java.util.List;
 
 @Configuration
 @EnableWebSecurity
@@ -17,6 +24,12 @@ public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthFilter;
     private final OAuth2LoginSuccessHandler oAuth2LoginSuccessHandler;
+
+    // Comma-separated origin patterns allowed to call the API from a BROWSER.
+    // Note: the mobile app is unaffected by this - CORS is a browser-only mechanism and native
+    // apps send no Origin header. Override with APP_CORS_ALLOWED_ORIGINS (no rebuild needed).
+    @Value("${app.cors.allowed-origins:https://settlementapi.ssbpgc.com,http://localhost:*,https://localhost:*}")
+    private String allowedOrigins;
 
     // Inject both the Bouncer and the Success Bridge
     public SecurityConfig(JwtAuthenticationFilter jwtAuthFilter, OAuth2LoginSuccessHandler oAuth2LoginSuccessHandler) {
@@ -30,6 +43,9 @@ public class SecurityConfig {
         http
                 // 1. Disable CSRF (We use JWTs, so we don't need this)
                 .csrf(csrf -> csrf.disable())
+
+                // 1b. CORS, configured centrally instead of scattered @CrossOrigin annotations.
+                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
 
                 // 2. Configure Endpoint Rules
                 .authorizeHttpRequests(auth -> auth
@@ -59,6 +75,22 @@ public class SecurityConfig {
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
+    }
+
+    @Bean
+    public CorsConfigurationSource corsConfigurationSource() {
+        CorsConfiguration config = new CorsConfiguration();
+        config.setAllowedOriginPatterns(Arrays.stream(allowedOrigins.split(","))
+                .map(String::trim)
+                .filter(o -> !o.isEmpty())
+                .toList());
+        config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
+        config.setAllowedHeaders(List.of("*"));
+        config.setAllowCredentials(true);
+
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", config);
+        return source;
     }
 
     // Adds prompt=select_account to the Google authorization request so the user is always
