@@ -73,15 +73,15 @@ export const apiService = {
     return response.data;
   },
   acceptDebt: async (id) => {
-    const response = await api.post(`/debts/${id}/accept`);
+    const response = await api.post(`/debts/${id}/accept`, {});
     return response.data;
   },
   declineDebt: async (id) => {
-    const response = await api.post(`/debts/${id}/decline`);
+    const response = await api.post(`/debts/${id}/decline`, {});
     return response.data;
   },
   restoreDebt: async (id) => {
-    const response = await api.post(`/debts/${id}/restore`);
+    const response = await api.post(`/debts/${id}/restore`, {});
     return response.data;
   },
   updateDebt: async (id, debtData) => {
@@ -104,7 +104,7 @@ export const apiService = {
     return response.data;
   },
   markNotificationsRead: async () => {
-    await api.post('/notifications/read');
+    await api.post('/notifications/read', {});
   },
 
   // Groups
@@ -121,7 +121,7 @@ export const apiService = {
     return response.data;
   },
   leaveGroup: async (id) => {
-    await api.post(`/groups/${id}/leave`);
+    await api.post(`/groups/${id}/leave`, {});
   },
 
   // Gamification
@@ -136,7 +136,7 @@ export const apiService = {
     return response.data;
   },
   deactivateAccount: async () => {
-    const response = await api.post('/persons/me/deactivate');
+    const response = await api.post('/persons/me/deactivate', {});
     return response.data;
   },
 

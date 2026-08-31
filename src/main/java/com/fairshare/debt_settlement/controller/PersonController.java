@@ -39,12 +39,26 @@ public class PersonController {
     }
 
     // GET /api/persons/check?phone=...
+    // Uses HashMap rather than Map.of: Map.of throws on a null value, so a person with no name
+    // (or a null normalized phone) turned this endpoint into a 500.
     @GetMapping("/check")
-    public ResponseEntity<?> checkPersonExists(@RequestParam String phone) {
+    public ResponseEntity<java.util.Map<String, Object>> checkPersonExists(@RequestParam String phone) {
+        java.util.Map<String, Object> result = new java.util.HashMap<>();
         String normalized = personService.normalizePhoneNumber(phone);
-        return personService.personRepository.findByPhoneNumber(normalized)
-                .map(p -> ResponseEntity.ok(java.util.Map.of("exists", true, "name", p.getName())))
-                .orElse(ResponseEntity.ok(java.util.Map.of("exists", false)));
+
+        if (normalized == null || normalized.isEmpty()) {
+            result.put("exists", false);
+            return ResponseEntity.ok(result);
+        }
+
+        personService.personRepository.findByPhoneNumber(normalized).ifPresentOrElse(
+                p -> {
+                    result.put("exists", true);
+                    result.put("name", p.getName());
+                },
+                () -> result.put("exists", false));
+
+        return ResponseEntity.ok(result);
     }
 
     // PUT /api/persons/me/phone
