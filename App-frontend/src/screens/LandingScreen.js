@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, StyleSheet, Image, TouchableOpacity, Dimensions, Animated, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Dimensions, Animated, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Theme } from '../theme/Theme';
 import { useNavigation } from '@react-navigation/native';
@@ -259,10 +259,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.28,
     shadowRadius: 26,
     elevation: 14,
-  },
-  logo: {
-    width: '100%',
-    height: '100%',
   },
   textContainer: {
     alignItems: 'center',

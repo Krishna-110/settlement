@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput, Modal, A
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useStore } from '../store/useStore';
 import { Theme } from '../theme/Theme';
-import { Users, Trash2, Plus, X, RefreshCw, CheckCircle2, UserPlus, Search } from 'lucide-react-native';
+import { Users, Trash2, Plus, X, RefreshCw, CheckCircle2, Search } from 'lucide-react-native';
 import { getDeviceContacts, normalizePhoneNumber } from '../services/ContactService';
 import apiService from '../services/apiService';
 import { APP_WEBSITE } from '../config/links';
@@ -307,9 +307,15 @@ const ManagePersonsScreen = () => {
                   <View style={styles.addedBadge}>
                     <Text style={styles.addedText}>Added</Text>
                   </View>
-                ) : (
+                ) : item.registered ? (
+                  // Already on Settlement - one tap adds them to your Circle.
                   <TouchableOpacity style={styles.circleAddBtn} onPress={() => addFromContacts(item)}>
                     <Plus size={24} color={Theme.colors.primary} />
+                  </TouchableOpacity>
+                ) : (
+                  // Not on the app yet - offer the SMS invite the sync message promises.
+                  <TouchableOpacity style={styles.inviteBtn} onPress={() => inviteContact(item)}>
+                    <Text style={styles.inviteText}>Invite</Text>
                   </TouchableOpacity>
                 )}
               </View>

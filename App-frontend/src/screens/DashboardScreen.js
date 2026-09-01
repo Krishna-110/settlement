@@ -7,7 +7,7 @@ import { Theme } from '../theme/Theme';
 import SummaryCard from '../components/SummaryCard';
 import DonutChart from '../components/DonutChart';
 import TransactionCard from '../components/TransactionCard';
-import { Bell, HandCoins, LogOut, CheckCircle } from 'lucide-react-native';
+import { Bell, HandCoins, LogOut } from 'lucide-react-native';
 import PhoneOnboardingModal from '../components/PhoneOnboardingModal';
 import { requestContactPermission } from '../services/ContactService';
 

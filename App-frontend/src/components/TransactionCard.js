@@ -1,7 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { Theme } from '../theme/Theme';
-import { MoveRight } from 'lucide-react-native';
 
 const TransactionCard = ({ debtor, creditor, amount, status, note }) => {
   const debtorName = debtor || 'Unknown';
