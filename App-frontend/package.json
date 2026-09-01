@@ -36,10 +36,9 @@
     "react-native-web": "^0.21.0",
     "zustand": "^5.0.12"
   },
-  
   "private": true,
   "devDependencies": {
-    "@react-native-community/cli": "latest"
+    "@react-native-community/cli": "latest",
+    "sharp": "^0.35.4"
   }
-
 }

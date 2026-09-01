@@ -15,6 +15,7 @@ const TransactionCard = ({ debtor, creditor, amount, status, note }) => {
 
   return (
     <View style={[styles.card, Theme.shadow.light, isMuted && styles.settledCard]}>
+      <View style={styles.row}>
       <View style={styles.personBlock}>
         <View style={[styles.avatar, isMuted && styles.settledAvatar]}>
           <Text style={[styles.avatarText, isMuted && styles.settledText]}>{debtorName.charAt(0).toUpperCase()}</Text>
@@ -59,12 +60,13 @@ const TransactionCard = ({ debtor, creditor, amount, status, note }) => {
           <Text style={styles.label}>{isMuted ? 'Recvd' : 'Gets'}</Text>
         </View>
       </View>
-      
-      {note && (
-        <View style={styles.noteOverlay}>
-          <Text style={styles.noteText}>{note}</Text>
-        </View>
-      )}
+      </View>
+
+      {/* Flows inside the card. It used to be absolutely positioned with bottom:-8, which made
+          long notes hang outside the card and overlap the section heading below it. */}
+      {note ? (
+        <Text style={styles.noteText} numberOfLines={2}>{note}</Text>
+      ) : null}
     </View>
   );
 };
@@ -74,13 +76,17 @@ const styles = StyleSheet.create({
     backgroundColor: Theme.colors.white,
     padding: Theme.spacing.md,
     borderRadius: Theme.borderRadius.xl,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
     marginBottom: Theme.spacing.sm,
     marginHorizontal: Theme.spacing.md,
     borderWidth: 1,
     borderColor: Theme.colors.border + '30',
+  },
+  // The debtor / amount / creditor line. Kept as its own row so the optional note can sit
+  // beneath it inside the card.
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
   personBlock: {
     flex: 1,
@@ -204,22 +210,15 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     color: Theme.colors.textSecondary,
   },
-  noteOverlay: {
-    position: 'absolute',
-    bottom: -8,
-    right: 12,
-    backgroundColor: Theme.colors.surface,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: Theme.colors.border + '50',
-  },
   noteText: {
-    fontSize: 9,
+    fontSize: 11,
     fontWeight: '600',
     color: Theme.colors.textSecondary,
     fontStyle: 'italic',
+    marginTop: Theme.spacing.sm,
+    paddingTop: Theme.spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: Theme.colors.border + '40',
   },
 });
 
