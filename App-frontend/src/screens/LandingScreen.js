@@ -2,7 +2,6 @@ import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Dimensions, Animated, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Theme } from '../theme/Theme';
-import { useNavigation } from '@react-navigation/native';
 import { ChevronRight, Check } from 'lucide-react-native';
 import Logo from '../components/Logo';
 import TermsModal from '../components/TermsModal';
@@ -19,8 +18,7 @@ WebBrowserInstance.maybeCompleteAuthSession();
 const { width, height } = Dimensions.get('window');
 
 const LandingScreen = () => {
-  const navigation = useNavigation();
-  const { setAuthenticated, checkAuth, isAuthenticated } = useStore();
+  const { setAuthenticated, checkAuth } = useStore();
   const [isAuthenticating, setIsAuthenticating] = useState(false);
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [termsModalVisible, setTermsModalVisible] = useState(false);
@@ -75,12 +73,9 @@ const LandingScreen = () => {
     createLoop(blob2Anim, -20).start();
   }, []);
 
-  // Redirect to Main if already authenticated
-  useEffect(() => {
-    if (isAuthenticated) {
-      navigation.navigate('Main');
-    }
-  }, [isAuthenticated]);
+  // No navigate() on sign-in: App.js swaps the whole Stack when isAuthenticated flips, so 'Main'
+  // replaces 'Landing' on its own. Calling navigate here raced that swap and could fire before
+  // 'Main' was registered, which React Navigation reports as an unhandled action.
 
   const toggleTermsAccepted = () => {
     const next = !termsAccepted;
@@ -115,9 +110,8 @@ const LandingScreen = () => {
     try {
       const { queryParams } = Linking.parse(url);
       if (queryParams && queryParams.token) {
-        // No explicit navigate here: setAuthenticated is async, so 'Main' isn't registered in the
-        // Stack yet at this point. The isAuthenticated-watching useEffect above navigates once the
-        // store (and therefore the Stack) has actually updated.
+        // Storing the token is all that's needed - App.js renders 'Main' instead of 'Landing'
+        // as soon as isAuthenticated flips, so there is nothing to navigate to by hand.
         setAuthenticated(queryParams.token);
       }
     } catch (err) {

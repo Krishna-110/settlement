@@ -62,7 +62,14 @@ export const useStore = create((set, get) => ({
   fetchData: async () => {
     // 1. Requirement check
     if (!get().isAuthenticated) return;
-    
+
+    // Logging in triggers this from several places at once - setAuthenticated fires it, then the
+    // Stack swaps to Main and DashboardScreen's useFocusEffect fires it again. Each call is 7
+    // parallel requests, and the HTTP client only opens ~5 connections per host, so the duplicates
+    // queue up behind each other and the dashboard sits on a spinner. One in-flight fetch is
+    // enough; the rest are refetching data that is already on its way.
+    if (get().isLoading) return;
+
     // 2. State management
     set({ isLoading: true, error: null });
     

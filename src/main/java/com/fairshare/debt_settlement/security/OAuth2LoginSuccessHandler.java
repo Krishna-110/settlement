@@ -45,6 +45,14 @@ public class OAuth2LoginSuccessHandler extends SimpleUrlAuthenticationSuccessHan
             return personRepository.save(newPerson);
         });
 
+        // Signing in again is how a deactivated account comes back. Without this the login still
+        // succeeds and hands out a JWT, but UserDetailsService filters on isActive(), so every
+        // subsequent request 401s and the app force-logs-out in a loop.
+        if (!person.isActive()) {
+            person.setActive(true);
+            personRepository.save(person);
+        }
+
         // Keep the profile picture fresh on subsequent logins.
         if (picture != null && !picture.equals(person.getPictureUrl())) {
             person.setPictureUrl(picture);

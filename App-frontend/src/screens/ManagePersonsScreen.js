@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput, Modal, Alert, ActivityIndicator, KeyboardAvoidingView, Platform, Linking } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput, Modal, Alert, ActivityIndicator, KeyboardAvoidingView, Platform, Share } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useStore } from '../store/useStore';
 import { Theme } from '../theme/Theme';
@@ -126,10 +126,17 @@ const ManagePersonsScreen = () => {
     }
   };
 
-  const inviteContact = (contact) => {
+  const inviteContact = async (contact) => {
+    // Share sheet rather than an sms: deep link. Android 11+ package visibility hides the SMS app
+    // unless it's declared in a <queries> manifest block, so openURL('sms:...') just rejects and
+    // the button appears dead. Share needs no manifest entry, and lets people invite over
+    // WhatsApp too. Same approach as the group invite in AccountScreen.
     const message = `Hey ${contact.name}! Join me on Settlement to track and settle our shared expenses easily. Download here: ${APP_WEBSITE}`;
-    const url = `sms:${contact.phoneNumber}${Platform.OS === 'ios' ? '&' : '?'}body=${encodeURIComponent(message)}`;
-    Linking.openURL(url);
+    try {
+      await Share.share({ message });
+    } catch (err) {
+      Alert.alert('Could not open share sheet', 'Please try again.');
+    }
   };
 
   const addFromContacts = async (contact) => {
