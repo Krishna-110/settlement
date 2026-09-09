@@ -3,6 +3,7 @@ package com.fairshare.debt_settlement.security;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -10,6 +11,7 @@ import org.springframework.security.oauth2.client.registration.ClientRegistratio
 import org.springframework.security.oauth2.client.web.DefaultOAuth2AuthorizationRequestResolver;
 import org.springframework.security.oauth2.client.web.OAuth2AuthorizationRequestResolver;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.HttpStatusEntryPoint;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
@@ -55,6 +57,19 @@ public class SecurityConfig {
                         .requestMatchers("/api/**").authenticated()
                         .anyRequest().authenticated()
                 )
+
+                // 2b. Unauthenticated /api/** must answer 401, not redirect.
+                //
+                // oauth2Login() installs a browser-style entry point, so without this an expired or
+                // rejected token on /api/profile 302s to /oauth2/authorization/google, then on to
+                // accounts.google.com. The mobile client follows redirects, so it received HTTP 200
+                // with ~885KB of Google's sign-in HTML instead of a 401: the 401 interceptor never
+                // fired, and the HTML string landed in the store where a list was expected, so the
+                // next .map() over it crashed the app. Browser OAuth login is untouched - this only
+                // changes what /api/** returns.
+                .exceptionHandling(ex -> ex.defaultAuthenticationEntryPointFor(
+                        new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED),
+                        request -> request.getRequestURI().startsWith("/api/")))
 
                 // 3. Stateless Sessions (Crucial for APIs interacting with Mobile Apps)
                 .sessionManagement(session -> session
