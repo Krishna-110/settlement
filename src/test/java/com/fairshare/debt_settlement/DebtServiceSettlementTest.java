@@ -121,7 +121,7 @@ class DebtServiceSettlementTest {
 
         assertThat(result.getStatus()).isEqualTo("UNCONFIRMED");
         assertThat(pending()).isEmpty(); // does not count until accepted
-        verify(smsService, times(1)).sendDebtNotification(eq("2222222222"), eq("A"), anyString(), anyBoolean(), eq("B"));
+        verify(smsService, times(1)).sendDebtNotification(eq("2222222222"), eq("A"), eq(500.0), anyBoolean(), eq("B"));
     }
 
     @Test
@@ -150,7 +150,7 @@ class DebtServiceSettlementTest {
 
         assertThat(result.getStatus()).isEqualTo("PENDING");
         assertThat(pending()).hasSize(1);
-        verify(smsService, never()).sendDebtNotification(anyString(), anyString(), anyString(), anyBoolean(), anyString());
+        verify(smsService, never()).sendDebtNotification(anyString(), anyString(), anyDouble(), anyBoolean(), anyString());
     }
 
     @Test

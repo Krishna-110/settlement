@@ -334,7 +334,7 @@ public class DebtService {
                 smsService.sendDebtNotification(
                         debtor.getPhoneNumber(),
                         debt.getCreditor().getName(),
-                        String.valueOf(debt.getAmount()),
+                        debt.getAmount(),
                         isRegistered,
                         debtor.getName()
                 );
