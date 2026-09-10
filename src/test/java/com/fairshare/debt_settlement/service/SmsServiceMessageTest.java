@@ -62,9 +62,24 @@ class SmsServiceMessageTest {
     @Test
     void wholeAmountsDropTheTrailingZero() {
         // String.valueOf(500.0) is "500.0", which shipped as "Rs.500.0".
-        assertThat(sms.buildMessage("K", 500.0, true, "P")).contains("Rs.500 ");
-        assertThat(sms.buildMessage("K", 500.5, true, "P")).contains("Rs.500.5");
-        assertThat(sms.buildMessage("K", 1234.567, true, "P")).contains("Rs.1234.57");
+        assertThat(sms.buildMessage("K", 500.0, true, "P")).contains("Rs. 500 ");
+        assertThat(sms.buildMessage("K", 500.5, true, "P")).contains("Rs. 500.5");
+        assertThat(sms.buildMessage("K", 1234.567, true, "P")).contains("Rs. 1234.57");
+    }
+
+    @Test
+    void onlyTheFirstNameIsUsed() {
+        // The template leaves ~45 characters for both names plus the amount; full names with
+        // surnames overflow 160 and cost a second segment.
+        String msg = sms.buildMessage("Krishnamurthy Raghavan", 500.0, false, "Priyadarshini Venkatesh");
+        assertThat(msg).contains("Hi Priyadarshini,").contains("Krishnamurthy has recorded");
+        assertThat(msg).doesNotContain("Venkatesh").doesNotContain("Raghavan");
+    }
+
+    @Test
+    void aMissingNameFallsBackRatherThanPrintingNull() {
+        assertThat(sms.buildMessage("Krishna", 500.0, false, null)).startsWith("Hi there,");
+        assertThat(sms.buildMessage("  ", 500.0, false, "Priya")).contains("there has recorded");
     }
 
     @Test

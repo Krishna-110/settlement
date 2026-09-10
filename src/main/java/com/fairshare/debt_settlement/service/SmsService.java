@@ -72,12 +72,25 @@ public class SmsService {
      */
     String buildMessage(String creditorName, double amount, boolean isRegistered, String debtorName) {
         String amt = fmtAmount(amount);
+        String to = shortName(debtorName);
+        String from = shortName(creditorName);
         if (isRegistered) {
-            return String.format("Hi %s, %s recorded Rs.%s you owe on Settlement. Open the app to accept or decline.",
-                    debtorName, creditorName, amt);
+            return String.format("Hi %s, %s has recorded Rs. %s you owe on Settlement app. Open the app to accept or decline.",
+                    to, from, amt);
         }
-        return String.format("Hi %s, %s recorded Rs.%s you owe on Settlement. Download the app to view and settle: %s",
-                debtorName, creditorName, amt, appLink);
+        return String.format("Hi %s, %s has recorded Rs. %s you owe on Settlement app. Download the app to view and settle: %s",
+                to, from, amt, appLink);
+    }
+
+    /**
+     * First name only, capped. The template leaves ~45 characters for both names and the amount
+     * before the message spills past 160 and costs a second segment; two full names with surnames
+     * blow straight through that. A first name is what you'd say in a text anyway.
+     */
+    private String shortName(String name) {
+        if (name == null || name.isBlank()) return "there";
+        String first = name.trim().split("\\s+")[0];
+        return first.length() > 16 ? first.substring(0, 16) : first;
     }
 
     /** 500.0 -> "500", 500.5 -> "500.5". Without this the SMS reads "Rs.500.0". */
