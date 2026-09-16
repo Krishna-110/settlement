@@ -1,0 +1,98 @@
+{
+  "info": {
+    "name": "Settlement - Backend Deploy Check",
+    "description": "Verifies whether settlementapi.ssbpgc.com is running current main.\n\nHOW TO USE\n1. Import this file into Postman.\n2. Open the collection > Variables tab, paste a JWT into `token`.\n   (Get one by opening https://settlementapi.ssbpgc.com/oauth2/authorization/google\n   in a browser and copying the token= value from the redirect URL.)\n3. Click the collection > Run > Run collection.\n\nTests 1 and 2 FAIL on the old build and PASS once the current JAR is deployed.\nTests 3 and 4 are controls: they pass either way, proving the server, database\nand authentication are all healthy and that tests 1-2 are not environment issues.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "https://settlementapi.ssbpgc.com" },
+    { "key": "token", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "1. FAILS - unauthenticated /api/** must return 401, not redirect",
+      "protocolProfileBehavior": { "followRedirects": false },
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": { "raw": "{{baseUrl}}/api/profile", "host": ["{{baseUrl}}"], "path": ["api", "profile"] },
+        "description": "Fixed by commit 6e37479 (9 Sep).\n\nEXPECTED: 401, no Location header.\nOLD BUILD: 302 with Location: /oauth2/authorization/google\n\nWhy it matters: the mobile app follows redirects, so it receives HTTP 200 and ~885KB of Google's sign-in HTML instead of a 401. The HTML string is then stored where a list is expected and the app crashes on .map().\n\nNOTE: 'Automatically follow redirects' is disabled on this request so the raw status is visible."
+      },
+      "event": [{
+        "listen": "test",
+        "script": { "type": "text/javascript", "exec": [
+          "pm.test('Status is 401 (302 means the old build is still running)', function () {",
+          "    pm.expect(pm.response.code, 'actual status').to.eql(401);",
+          "});",
+          "pm.test('No Location header (a redirect means the old build)', function () {",
+          "    pm.expect(pm.response.headers.has('Location'), 'Location header present').to.be.false;",
+          "});"
+        ]}
+      }]
+    },
+    {
+      "name": "2. FAILS - GET /api/persons/check returns 500 on every input",
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+        "url": {
+          "raw": "{{baseUrl}}/api/persons/check?phone=1234567890",
+          "host": ["{{baseUrl}}"], "path": ["api", "persons", "check"],
+          "query": [{ "key": "phone", "value": "1234567890" }]
+        },
+        "description": "Fixed by commit 4b73036 (31 Aug).\n\nEXPECTED: 200 with {\"exists\": true, \"name\": \"...\"}\nOLD BUILD: 500 Internal Server Error on every input, valid or not.\n\nCause: Map.of() throws NullPointerException when given a null value."
+      },
+      "event": [{
+        "listen": "test",
+        "script": { "type": "text/javascript", "exec": [
+          "pm.test('Status is 200 (500 means the old build is still running)', function () {",
+          "    pm.expect(pm.response.code, 'actual status').to.eql(200);",
+          "});",
+          "pm.test('Body contains an exists flag', function () {",
+          "    pm.expect(pm.response.json()).to.have.property('exists');",
+          "});"
+        ]}
+      }]
+    },
+    {
+      "name": "3. CONTROL - batch contact lookup works (server + DB + auth are fine)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{token}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": { "mode": "raw", "raw": "[\"1234567890\", \"9999999999\"]" },
+        "url": { "raw": "{{baseUrl}}/api/persons/check-contacts", "host": ["{{baseUrl}}"], "path": ["api", "persons", "check-contacts"] },
+        "description": "Control request. This hits the same service and the same database table as test 2, and it PASSES.\n\nThat rules out the database, the token and the network as the cause of test 2 - the only difference is the handler, which is what commit 4b73036 fixes."
+      },
+      "event": [{
+        "listen": "test",
+        "script": { "type": "text/javascript", "exec": [
+          "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
+          "pm.test('Returns a result per phone number', function () {",
+          "    pm.expect(pm.response.json()).to.be.an('array').with.lengthOf(2);",
+          "});"
+        ]}
+      }]
+    },
+    {
+      "name": "4. CONTROL - authenticated reads work",
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+        "url": { "raw": "{{baseUrl}}/api/profile", "host": ["{{baseUrl}}"], "path": ["api", "profile"] },
+        "description": "Control request. Proves the token is valid and the API serves data normally. The failures above are not auth or connectivity problems."
+      },
+      "event": [{
+        "listen": "test",
+        "script": { "type": "text/javascript", "exec": [
+          "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
+          "pm.test('Returns a profile with an email', function () {",
+          "    pm.expect(pm.response.json()).to.have.property('email');",
+          "});"
+        ]}
+      }]
+    }
+  ]
+}

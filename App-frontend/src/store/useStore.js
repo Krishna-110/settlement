@@ -83,7 +83,16 @@ export const useStore = create((set, get) => ({
         apiService.getGroups().catch(() => []),
         apiService.getGamification().catch(() => null),
       ]);
-      set({ persons, debts, settlements, user, notifications, groups, gamification, isLoading: false });
+      set({
+        persons: Array.isArray(persons) ? persons : [],
+        debts: Array.isArray(debts) ? debts : [],
+        settlements: Array.isArray(settlements) ? settlements : [],
+        user: (user && typeof user === 'object' && !Array.isArray(user)) ? user : null,
+        notifications: Array.isArray(notifications) ? notifications : [],
+        groups: Array.isArray(groups) ? groups : [],
+        gamification: (gamification && typeof gamification === 'object') ? gamification : null,
+        isLoading: false,
+      });
     } catch (err) {
       const errorMessage = err.response?.data?.message || err.message || 'Network error';
       set({ error: errorMessage, isLoading: false });

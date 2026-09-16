@@ -16,15 +16,18 @@ const SettlementScreen = () => {
     }, [fetchData])
   );
 
-  const displayedSettlements = settlements.filter(
-    s => s.fromPhone === user?.phoneNumber || s.toPhone === user?.phoneNumber
+  const safeSettlements = Array.isArray(settlements) ? settlements : [];
+  const safeDebts = Array.isArray(debts) ? debts : [];
+
+  const displayedSettlements = safeSettlements.filter(
+    s => s && (s.fromPhone === user?.phoneNumber || s.toPhone === user?.phoneNumber)
   );
 
   // Does the user still have open debts even though the optimizer has nothing for them?
   // That happens when they're a "middleman" who nets to zero - the optimizer routes
   // around them, so they have nothing to do but their debts aren't gone yet.
-  const hasPendingDebts = debts.some(
-    d => d.status === 'PENDING'
+  const hasPendingDebts = safeDebts.some(
+    d => d && d.status === 'PENDING'
       && (d.debtor?.phoneNumber === user?.phoneNumber || d.creditor?.phoneNumber === user?.phoneNumber)
   );
 

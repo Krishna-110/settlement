@@ -9,8 +9,9 @@ import TransactionCard from '../components/TransactionCard';
 const HistoryScreen = ({ navigation }) => {
   const { debts, user, restoreDebt } = useStore();
 
-  const userDebts = debts
-    .filter(d => (d.debtor?.phoneNumber === user?.phoneNumber || d.creditor?.phoneNumber === user?.phoneNumber)
+  const safeDebts = Array.isArray(debts) ? debts : [];
+  const userDebts = safeDebts
+    .filter(d => d && (d.debtor?.phoneNumber === user?.phoneNumber || d.creditor?.phoneNumber === user?.phoneNumber)
       && d.status !== 'UNCONFIRMED') // unconfirmed proposals aren't real transactions yet
     .sort((a, b) => b.id - a.id);
 

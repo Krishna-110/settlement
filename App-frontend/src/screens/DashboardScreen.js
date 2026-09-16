@@ -149,8 +149,9 @@ const DashboardScreen = ({ navigation }) => {
   const myPhone = user?.phoneNumber;
 
   const balanceByPhone = {}; // phone -> { name, amount }  (amount > 0: they owe you; < 0: you owe them)
-  debts
-    .filter(d => d.status === 'PENDING'
+  const safeDebts = Array.isArray(debts) ? debts : [];
+  safeDebts
+    .filter(d => d && d.status === 'PENDING'
       && (d.debtor?.phoneNumber === myPhone || d.creditor?.phoneNumber === myPhone))
     .forEach(d => {
       const youAreCreditor = d.creditor?.phoneNumber === myPhone;
@@ -173,17 +174,17 @@ const DashboardScreen = ({ navigation }) => {
   const userTotalDebts = totalOwe; // "Total Debts" = what YOU owe
 
   // Total Settled volume = sum of the user's SETTLED debts.
-  const totalSettled = debts
+  const totalSettled = safeDebts
     .filter(d =>
-      (d.debtor?.phoneNumber === myPhone || d.creditor?.phoneNumber === myPhone) &&
+      d && (d.debtor?.phoneNumber === myPhone || d.creditor?.phoneNumber === myPhone) &&
       d.status === 'SETTLED'
     )
     .reduce((acc, d) => acc + d.amount, 0);
 
   // Debts the user must confirm (someone says you owe them), and ones they proposed
   // and are waiting on (you say someone owes you).
-  const toConfirm = debts.filter(d => d.status === 'UNCONFIRMED' && d.debtor?.phoneNumber === myPhone);
-  const waitingOnOthers = debts.filter(d => d.status === 'UNCONFIRMED' && d.creditor?.phoneNumber === myPhone);
+  const toConfirm = safeDebts.filter(d => d && d.status === 'UNCONFIRMED' && d.debtor?.phoneNumber === myPhone);
+  const waitingOnOthers = safeDebts.filter(d => d && d.status === 'UNCONFIRMED' && d.creditor?.phoneNumber === myPhone);
 
   return (
     <SafeAreaView style={styles.container}>

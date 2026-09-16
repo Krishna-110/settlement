@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, ActivityIndicator, StyleSheet, Alert } from 'react-native';
+import { View, ActivityIndicator, StyleSheet, Alert, Text, TouchableOpacity } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
@@ -21,14 +21,51 @@ import AccountScreen from './src/screens/AccountScreen';
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
 
+class ErrorBoundary extends React.Component {
+  state = { hasError: false };
+
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error, info) {
+    console.error('ErrorBoundary caught unhandled error:', error, info);
+  }
+
+  handleRestart = async () => {
+    try {
+      await useStore.getState().logout();
+    } catch (e) {}
+    this.setState({ hasError: false });
+  };
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorTitle}>Something went wrong</Text>
+          <Text style={styles.errorSubtitle}>
+            An unexpected error occurred. Please return to the sign-in screen.
+          </Text>
+          <TouchableOpacity style={styles.errorButton} onPress={this.handleRestart}>
+            <Text style={styles.errorButtonText}>Return to Sign In</Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 function MainTabs() {
   const insets = useSafeAreaInsets();
   const debts = useStore((s) => s.debts);
   const user = useStore((s) => s.user);
 
   // How many debts are waiting for THIS user to confirm.
-  const pendingConfirmations = debts.filter(
-    (d) => d.status === 'UNCONFIRMED' && d.debtor?.phoneNumber === user?.phoneNumber
+  const safeDebts = Array.isArray(debts) ? debts : [];
+  const pendingConfirmations = safeDebts.filter(
+    (d) => d && d.status === 'UNCONFIRMED' && d.debtor?.phoneNumber === user?.phoneNumber
   ).length;
 
   return (
@@ -156,18 +193,20 @@ export default function App() {
 
   return (
     <SafeAreaProvider>
-      <NavigationContainer>
-        <Stack.Navigator screenOptions={{ headerShown: false }}>
-          {isAuthenticated ? (
-            <>
-              <Stack.Screen name="Main" component={MainTabs} />
-              <Stack.Screen name="History" component={HistoryScreen} />
-            </>
-          ) : (
-            <Stack.Screen name="Landing" component={LandingScreen} />
-          )}
-        </Stack.Navigator>
-      </NavigationContainer>
+      <ErrorBoundary>
+        <NavigationContainer>
+          <Stack.Navigator screenOptions={{ headerShown: false }}>
+            {isAuthenticated ? (
+              <>
+                <Stack.Screen name="Main" component={MainTabs} />
+                <Stack.Screen name="History" component={HistoryScreen} />
+              </>
+            ) : (
+              <Stack.Screen name="Landing" component={LandingScreen} />
+            )}
+          </Stack.Navigator>
+        </NavigationContainer>
+      </ErrorBoundary>
     </SafeAreaProvider>
   );
 }
@@ -178,5 +217,37 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: Theme.colors.white,
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: Theme.spacing.lg,
+    backgroundColor: Theme.colors.white,
+  },
+  errorTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: Theme.colors.text,
+    marginBottom: Theme.spacing.sm,
+    textAlign: 'center',
+  },
+  errorSubtitle: {
+    fontSize: 14,
+    color: Theme.colors.textSecondary,
+    textAlign: 'center',
+    marginBottom: Theme.spacing.lg,
+    lineHeight: 20,
+  },
+  errorButton: {
+    backgroundColor: Theme.colors.primary,
+    paddingHorizontal: Theme.spacing.lg,
+    paddingVertical: Theme.spacing.md,
+    borderRadius: Theme.borderRadius.md,
+  },
+  errorButtonText: {
+    color: Theme.colors.white,
+    fontWeight: '600',
+    fontSize: 15,
   },
 });

@@ -24,9 +24,22 @@ api.interceptors.request.use(async (config) => {
   return Promise.reject(error);
 });
 
-// Response Interceptor: Handle auth errors (e.g., token expired)
+// Response Interceptor: Handle auth errors (e.g., token expired, or HTML login redirects)
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    // If the backend redirected to a login page (e.g. Google sign-in HTML) or returned HTML for an API call,
+    // Axios receives HTTP 200 with an HTML string. Treat this as 401 Unauthorized so the app logs out cleanly
+    // instead of parsing HTML as JSON data and crashing.
+    if (
+      typeof response.data === 'string' &&
+      (response.data.includes('<!DOCTYPE') || response.data.includes('<html') || response.data.includes('accounts.google.com'))
+    ) {
+      const authError = new Error('Session invalid or received HTML login redirect');
+      authError.response = { status: 401, data: response.data };
+      return Promise.reject(authError);
+    }
+    return response;
+  },
   async (error) => {
     if (error.response && error.response.status === 401) {
       // Logic for force logout can be added here
