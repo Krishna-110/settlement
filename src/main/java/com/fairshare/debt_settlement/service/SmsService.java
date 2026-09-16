@@ -21,7 +21,7 @@ public class SmsService {
     @Value("${vonage.brand.name:Settlement}")
     private String brandName;
 
-    @Value("${vonage.app.link:https://settleyourdues.com/}")
+    @Value("${vonage.app.link:https://settleyourdues.com/app}")
     private String appLink;
 
     private VonageClient client;

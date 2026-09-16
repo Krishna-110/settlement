@@ -11,7 +11,7 @@ import {
   LogOut, Pencil, QrCode, Share2, Trophy, Flame, Lock, Plus, LogIn, Users, ChevronRight,
 } from 'lucide-react-native';
 
-import { APP_WEBSITE, joinGroupLink, qrImageUrl } from '../config/links';
+import { APP_WEBSITE, APP_DOWNLOAD_LINK, joinGroupLink, qrImageUrl } from '../config/links';
 
 const inviteLinkFor = (group) => joinGroupLink(group.joinCode);
 const qrUrl = qrImageUrl;
@@ -22,7 +22,7 @@ const inviteMessageFor = (group) =>
   `Join my group "${group.name}" on Settlement!\n\n` +
   `Group code: ${group.joinCode}\n\n` +
   `Tap to join: ${inviteLinkFor(group)}\n\n` +
-  `Don't have the app yet? ${APP_WEBSITE}`;
+  `Don't have the app yet? ${APP_DOWNLOAD_LINK}`;
 
 const AccountScreen = () => {
   const {

@@ -6,7 +6,7 @@ import { Theme } from '../theme/Theme';
 import { Users, Trash2, Plus, X, RefreshCw, CheckCircle2, Search } from 'lucide-react-native';
 import { getDeviceContacts, normalizePhoneNumber } from '../services/ContactService';
 import apiService from '../services/apiService';
-import { APP_WEBSITE } from '../config/links';
+import { APP_WEBSITE, APP_DOWNLOAD_LINK } from '../config/links';
 
 // Ordering for the Contacts tab: people already on the app come first (the ones you can actually
 // transact with), then those you've already added, then everyone else - each alphabetical.
@@ -131,7 +131,7 @@ const ManagePersonsScreen = () => {
     // unless it's declared in a <queries> manifest block, so openURL('sms:...') just rejects and
     // the button appears dead. Share needs no manifest entry, and lets people invite over
     // WhatsApp too. Same approach as the group invite in AccountScreen.
-    const message = `Hey ${contact.name}! Join me on Settlement to track and settle our shared expenses easily. Download here: ${APP_WEBSITE}`;
+    const message = `Hey ${contact.name}! Join me on Settlement to track and settle our shared expenses easily. Download here: ${APP_DOWNLOAD_LINK}`;
     try {
       await Share.share({ message });
     } catch (err) {

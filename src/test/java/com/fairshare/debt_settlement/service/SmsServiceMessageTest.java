@@ -30,7 +30,7 @@ class SmsServiceMessageTest {
     @BeforeEach
     void setup() {
         sms = new SmsService();
-        ReflectionTestUtils.setField(sms, "appLink", "https://settleyourdues.com/");
+        ReflectionTestUtils.setField(sms, "appLink", "https://settleyourdues.com/app");
     }
 
     private static String nonGsm7Chars(String s) {
@@ -47,7 +47,7 @@ class SmsServiceMessageTest {
 
         // It used to accept `amount` and never print it - "a debt" with no figure.
         assertThat(msg).contains("500");
-        assertThat(msg).contains("https://settleyourdues.com/");
+        assertThat(msg).contains("https://settleyourdues.com/app");
         assertThat(msg).contains("Priya").contains("Krishna");
     }
 

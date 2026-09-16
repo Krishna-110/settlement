@@ -51,8 +51,8 @@ public class SecurityConfig {
 
                 // 2. Configure Endpoint Rules
                 .authorizeHttpRequests(auth -> auth
-                        // Allow login routes, error pages, and static assets
-                        .requestMatchers("/error", "/", "/login**", "/oauth2/**", "/favicon.ico").permitAll()
+                        // Allow login routes, error pages, static assets, and public app redirect endpoints
+                        .requestMatchers("/error", "/", "/login**", "/oauth2/**", "/favicon.ico", "/app**", "/download**", "/r/**").permitAll()
                         // Lock down all actual data APIs
                         .requestMatchers("/api/**").authenticated()
                         .anyRequest().authenticated()

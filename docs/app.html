@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Settlement — Get the App</title>
+<style>
+  body {
+    max-width: 32rem; margin: 0 auto; padding: 3rem 1.5rem;
+    font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    color: #1a1d24; text-align: center; background: #f8fafc;
+  }
+  .card {
+    background: #ffffff; border-radius: 16px; padding: 2.5rem 1.75rem;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.06); border: 1px solid #e2e8f0;
+  }
+  h1 { font-size: 1.6rem; margin: 1rem 0 0.5rem; font-weight: 700; }
+  p { color: #64748b; font-size: 0.95rem; margin-bottom: 2rem; }
+  .btn {
+    display: inline-block; width: 100%; box-sizing: border-box;
+    padding: 0.9rem 1.5rem; border-radius: 10px; font-weight: 600;
+    text-decoration: none; font-size: 1rem; transition: all 0.2s;
+    background: #4f46e5; color: #ffffff;
+  }
+  .btn:hover { background: #4338ca; }
+  .spinner {
+    display: inline-block; width: 40px; height: 40px;
+    border: 3px solid #e2e8f0; border-radius: 50%;
+    border-top-color: #4f46e5; animation: spin 1s ease-in-out infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+<script>
+  // Dynamic destination URL.
+  // Update this destination anytime without modifying DLT templates!
+  //
+  // 1. Closed Testing: https://play.google.com/apps/testing/com.cleardues
+  // 2. Production Public Play Store: https://play.google.com/store/apps/details?id=com.cleardues
+  // 3. Fallback/Website: https://settleyourdues.com/
+  var TARGET_PLAYSTORE_URL = "https://play.google.com/store/apps/details?id=com.cleardues";
+  var CLOSED_TESTING_URL = "https://play.google.com/apps/testing/com.cleardues";
+
+  // Check URL query parameter override if needed, e.g. /app.html?testing=true
+  var params = new URLSearchParams(window.location.search);
+  var destination = params.get("target") || (params.has("testing") ? CLOSED_TESTING_URL : TARGET_PLAYSTORE_URL);
+
+  // Attempt automatic redirect immediately
+  window.location.replace(destination);
+</script>
+</head>
+<body>
+
+<div class="card">
+  <div class="spinner"></div>
+  <h1>Redirecting to Settlement...</h1>
+  <p>Taking you to the download page. If you are not redirected in a few seconds, tap the button below.</p>
+  <a id="redirect-link" class="btn" href="https://play.google.com/store/apps/details?id=com.cleardues">
+    Download on Google Play
+  </a>
+</div>
+
+<script>
+  document.getElementById("redirect-link").href = destination;
+</script>
+
+</body>
+</html>

@@ -7,6 +7,8 @@
 // TODO: swap for https://play.google.com/store/apps/details?id=com.cleardues once the listing is
 // live - a Play link beats a sideloaded APK for both trust and install rate.
 export const APP_WEBSITE = 'https://settleyourdues.com/';
+// Dynamic download link: points to the smart redirect endpoint that forwards to Google Play / testing
+export const APP_DOWNLOAD_LINK = 'https://settleyourdues.com/app';
 
 // Invite link for a group. This is an https:// URL rather than the settlement:// deep link,
 // because WhatsApp and SMS only turn http(s) into something tappable - a custom scheme renders
