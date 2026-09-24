@@ -12,6 +12,11 @@ const TransactionCard = ({ debtor, creditor, amount, status, note }) => {
   const isDeleted = status === 'DELETED';
   const isMuted = isSettled || isDeclined || isDeleted; // inactive -> greyed / struck-through
 
+  const isDebtorYou = debtorName.trim().toLowerCase() === 'you';
+  const isCreditorYou = creditorName.trim().toLowerCase() === 'you';
+  const debtorLabel = isMuted ? 'Owed' : (isDebtorYou ? 'Owe' : 'Owes');
+  const creditorLabel = isMuted ? 'Recvd' : (isCreditorYou ? 'Get' : 'Gets');
+
   return (
     <View style={[styles.card, Theme.shadow.light, isMuted && styles.settledCard]}>
       <View style={styles.row}>
@@ -21,7 +26,7 @@ const TransactionCard = ({ debtor, creditor, amount, status, note }) => {
         </View>
         <View style={styles.details}>
           <Text style={[styles.name, isMuted && styles.settledText]} numberOfLines={1}>{debtorName}</Text>
-          <Text style={styles.label}>{isMuted ? 'Owed' : 'Owes'}</Text>
+          <Text style={styles.label}>{debtorLabel}</Text>
         </View>
       </View>
 
@@ -56,7 +61,7 @@ const TransactionCard = ({ debtor, creditor, amount, status, note }) => {
         </View>
         <View style={[styles.details, { alignItems: 'flex-end' }]}>
           <Text style={[styles.name, isMuted && styles.settledText]} numberOfLines={1}>{creditorName}</Text>
-          <Text style={styles.label}>{isMuted ? 'Recvd' : 'Gets'}</Text>
+          <Text style={styles.label}>{creditorLabel}</Text>
         </View>
       </View>
       </View>
@@ -91,6 +96,7 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
+    minWidth: 0,
   },
   avatar: {
     width: 32,
@@ -108,6 +114,7 @@ const styles = StyleSheet.create({
   },
   details: {
     flex: 1,
+    minWidth: 0,
   },
   name: {
     fontSize: 14,

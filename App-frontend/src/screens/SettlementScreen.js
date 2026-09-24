@@ -31,6 +31,9 @@ const SettlementScreen = () => {
       && (d.debtor?.phoneNumber === user?.phoneNumber || d.creditor?.phoneNumber === user?.phoneNumber)
   );
 
+  const isFromMe = (s) => Boolean(user?.phoneNumber && s?.fromPhone === user?.phoneNumber);
+  const isToMe = (s) => Boolean(user?.phoneNumber && s?.toPhone === user?.phoneNumber);
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
@@ -43,26 +46,36 @@ const SettlementScreen = () => {
         </Text>
       </View>
 
-
-
       <FlatList
         data={displayedSettlements}
-        keyExtractor={(item, index) => index.toString()}
-        renderItem={({ item }) => (
-          <View style={styles.settlementItem}>
-            <TransactionCard
-              debtor={item?.from || 'Unknown'}
-              creditor={item?.to || 'Unknown'}
-              amount={item?.amount || 0}
-            />
-            <View style={styles.actionPrompt}>
-              <Sparkles size={12} color={Theme.colors.secondary} />
-              <Text style={styles.promptText}>
-                {item?.from} needs to pay {item?.to} ₹{item?.amount}
-              </Text>
+        keyExtractor={(item, index) => `${item?.fromPhone || ''}-${item?.toPhone || ''}-${index}`}
+        renderItem={({ item }) => {
+          const fromIsMe = isFromMe(item);
+          const toIsMe = isToMe(item);
+          const debtorName = fromIsMe ? 'You' : (item?.from || 'Unknown');
+          const creditorName = toIsMe ? 'You' : (item?.to || 'Unknown');
+
+          let promptText = `${item?.from || 'Unknown'} needs to pay ${item?.to || 'Unknown'} ₹${item?.amount || 0}`;
+          if (fromIsMe) {
+            promptText = `You need to pay ${item?.to || 'them'} ₹${item?.amount || 0}`;
+          } else if (toIsMe) {
+            promptText = `${item?.from || 'They'} needs to pay You ₹${item?.amount || 0}`;
+          }
+
+          return (
+            <View style={styles.settlementItem}>
+              <TransactionCard
+                debtor={debtorName}
+                creditor={creditorName}
+                amount={item?.amount || 0}
+              />
+              <View style={styles.actionPrompt}>
+                <Sparkles size={12} color={Theme.colors.secondary} />
+                <Text style={styles.promptText}>{promptText}</Text>
+              </View>
             </View>
-          </View>
-        )}
+          );
+        }}
         contentContainerStyle={styles.list}
         refreshControl={
           <RefreshControl refreshing={isLoading} onRefresh={fetchData} tintColor={Theme.colors.primary} />

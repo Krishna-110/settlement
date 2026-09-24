@@ -58,6 +58,30 @@ const DashboardScreen = ({ navigation }) => {
     );
   };
 
+  const handleCancelWaiting = (debt) => {
+    Alert.alert(
+      'Cancel this request?',
+      `Are you sure you want to cancel the ₹${debt.amount} request sent to ${debt.debtor?.name || 'them'}?`,
+      [
+        { text: 'Keep', style: 'cancel' },
+        {
+          text: 'Cancel Request',
+          style: 'destructive',
+          onPress: async () => {
+            setActingOnId(debt.id);
+            try {
+              await deleteDebt(debt.id);
+            } catch (e) {
+              Alert.alert('Error', 'Could not cancel request. Please try again.');
+            } finally {
+              setActingOnId(null);
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const handleRestore = async () => {
     if (!selectedDebt) return;
     setIsSubmitting(true);
@@ -147,6 +171,19 @@ const DashboardScreen = ({ navigation }) => {
   // deliberately independent of the optimized Settlements tab: the dashboard shows what
   // YOU actually owe and are owed, even when the global optimizer routes around you.
   const myPhone = user?.phoneNumber;
+
+  const isMe = (person) => {
+    if (!person || !user) return false;
+    if (person.id && user.id && person.id === user.id) return true;
+    if (person.phoneNumber && user.phoneNumber && person.phoneNumber === user.phoneNumber) return true;
+    if (person.email && user.email && person.email.toLowerCase() === user.email.toLowerCase()) return true;
+    return false;
+  };
+
+  const getDisplayName = (person) => {
+    if (isMe(person)) return 'You';
+    return person?.name || 'Unknown';
+  };
 
   const balanceByPhone = {}; // phone -> { name, amount }  (amount > 0: they owe you; < 0: you owe them)
   const safeDebts = Array.isArray(debts) ? debts : [];
@@ -244,16 +281,16 @@ const DashboardScreen = ({ navigation }) => {
 
         {/* Needs Your Confirmation - debts others recorded against you */}
         {toConfirm.length > 0 && (
-          <>
+          <View style={styles.sectionContainer}>
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>Needs Your Confirmation</Text>
             </View>
             <View style={styles.settlementList}>
               {toConfirm.map((d, index) => (
-                <View key={index} style={styles.confirmItem}>
+                <View key={d.id || index} style={styles.confirmItem}>
                   <TransactionCard
-                    debtor={d.debtor?.name}
-                    creditor={d.creditor?.name}
+                    debtor={getDisplayName(d.debtor)}
+                    creditor={getDisplayName(d.creditor)}
                     amount={d.amount}
                     status="UNCONFIRMED"
                     note={d.note}
@@ -281,91 +318,108 @@ const DashboardScreen = ({ navigation }) => {
                 </View>
               ))}
             </View>
-          </>
+          </View>
         )}
 
         {/* Waiting on others to confirm debts you recorded */}
         {waitingOnOthers.length > 0 && (
-          <>
+          <View style={styles.sectionContainer}>
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>Waiting for Confirmation</Text>
             </View>
             <View style={styles.settlementList}>
               {waitingOnOthers.map((d, index) => (
-                <View key={index} style={{ opacity: 0.7 }}>
+                <View key={d.id || index} style={styles.confirmItem}>
                   <TransactionCard
-                    debtor={d.debtor?.name}
-                    creditor={d.creditor?.name}
+                    debtor={getDisplayName(d.debtor)}
+                    creditor={getDisplayName(d.creditor)}
                     amount={d.amount}
                     status="UNCONFIRMED"
-                    note={`Waiting for ${d.debtor?.name} to accept`}
+                    note={`Waiting for ${d.debtor?.name || 'them'} to accept`}
                   />
+                  <View style={styles.confirmActions}>
+                    <TouchableOpacity
+                      style={[styles.confirmBtn, styles.declineBtn]}
+                      disabled={actingOnId === d.id}
+                      onPress={() => handleCancelWaiting(d)}
+                    >
+                      {actingOnId === d.id ? (
+                        <ActivityIndicator color={Theme.colors.danger} size="small" />
+                      ) : (
+                        <Text style={styles.declineText}>Cancel Request</Text>
+                      )}
+                    </TouchableOpacity>
+                  </View>
                 </View>
               ))}
             </View>
-          </>
+          </View>
         )}
 
         {/* Your Balances Section - who you owe and who owes you (netted per person) */}
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Your Balances</Text>
-          <TouchableOpacity onPress={() => navigation.navigate('Settlements')}>
-            <Text style={styles.sectionAction}>Optimize</Text>
-          </TouchableOpacity>
-        </View>
+        <View style={styles.sectionContainer}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Your Balances</Text>
+            <TouchableOpacity onPress={() => navigation.navigate('Settlements')}>
+              <Text style={styles.sectionAction}>Optimize</Text>
+            </TouchableOpacity>
+          </View>
 
-        <View style={styles.settlementList}>
-          {myBalances.map((b, index) => {
-            const theyOweYou = b.amount > 0;
-            return (
-              <TransactionCard
-                key={index}
-                debtor={theyOweYou ? b.name : 'You'}
-                creditor={theyOweYou ? 'You' : b.name}
-                amount={Math.abs(b.amount)}
-                status="PENDING"
-              />
-            );
-          })}
+          <View style={styles.settlementList}>
+            {myBalances.map((b, index) => {
+              const theyOweYou = b.amount > 0;
+              return (
+                <TransactionCard
+                  key={index}
+                  debtor={theyOweYou ? b.name : 'You'}
+                  creditor={theyOweYou ? 'You' : b.name}
+                  amount={Math.abs(b.amount)}
+                  status="PENDING"
+                />
+              );
+            })}
 
-          {myBalances.length === 0 && (
-            <View style={styles.emptyContainer}>
-              <Text style={styles.emptyText}>You're all squared up! 🎉</Text>
-            </View>
-          )}
+            {myBalances.length === 0 && (
+              <View style={styles.emptyContainer}>
+                <Text style={styles.emptyText}>You're all squared up! 🎉</Text>
+              </View>
+            )}
+          </View>
         </View>
 
         {/* Transaction History Section */}
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Transaction History</Text>
-          <TouchableOpacity onPress={() => navigation.navigate('History')}>
-            <Text style={styles.sectionAction}>View All</Text>
-          </TouchableOpacity>
-        </View>
-        
-        <View style={styles.settlementList}>
-          {debts
-            .filter(d => (d.debtor?.phoneNumber === user?.phoneNumber || d.creditor?.phoneNumber === user?.phoneNumber)
-              && d.status !== 'UNCONFIRMED') // unconfirmed shows in the confirmation sections, not the log
-            .sort((a, b) => b.id - a.id) // Show newest first
-            .slice(0, 5)
-            .map((d, index) => (
-            <TouchableOpacity key={index} onPress={() => openEditModal(d)}>
-              <TransactionCard 
-                debtor={d.debtor?.name}
-                creditor={d.creditor?.name}
-                amount={d.amount}
-                status={d.status}
-                note={d.note}
-              />
+        <View style={styles.sectionContainer}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Transaction History</Text>
+            <TouchableOpacity onPress={() => navigation.navigate('History')}>
+              <Text style={styles.sectionAction}>View All</Text>
             </TouchableOpacity>
-          ))}
+          </View>
+          
+          <View style={styles.settlementList}>
+            {debts
+              .filter(d => (d.debtor?.phoneNumber === user?.phoneNumber || d.creditor?.phoneNumber === user?.phoneNumber)
+                && d.status !== 'UNCONFIRMED') // unconfirmed shows in the confirmation sections, not the log
+              .sort((a, b) => b.id - a.id) // Show newest first
+              .slice(0, 5)
+              .map((d, index) => (
+              <TouchableOpacity key={d.id || index} onPress={() => openEditModal(d)} activeOpacity={0.8}>
+                <TransactionCard 
+                  debtor={getDisplayName(d.debtor)}
+                  creditor={getDisplayName(d.creditor)}
+                  amount={d.amount}
+                  status={d.status}
+                  note={d.note}
+                />
+              </TouchableOpacity>
+            ))}
 
-          {debts.length === 0 && (
-            <View style={styles.emptyContainer}>
-              <Text style={styles.emptyText}>No transactions found.</Text>
-            </View>
-          )}
+            {debts.length === 0 && (
+              <View style={styles.emptyContainer}>
+                <Text style={styles.emptyText}>No transactions found.</Text>
+              </View>
+            )}
+          </View>
         </View>
 
         {/* Bottom Spacer */}
@@ -596,6 +650,9 @@ const styles = StyleSheet.create({
   summaryRow: {
     flexDirection: 'row',
     marginBottom: Theme.spacing.sm,
+  },
+  sectionContainer: {
+    marginBottom: Theme.spacing.lg,
   },
   sectionHeader: {
     flexDirection: 'row',

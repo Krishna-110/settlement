@@ -15,10 +15,31 @@ const HistoryScreen = ({ navigation }) => {
       && d.status !== 'UNCONFIRMED') // unconfirmed proposals aren't real transactions yet
     .sort((a, b) => b.id - a.id);
 
+  const isMe = (person) => {
+    if (!person) return false;
+    if (user?.phoneNumber && person.phoneNumber && user.phoneNumber === person.phoneNumber) {
+      return true;
+    }
+    if (user?.id && person.id && user.id === person.id) {
+      return true;
+    }
+    if (user?.email && person.email && user.email === person.email) {
+      return true;
+    }
+    return false;
+  };
+
+  const getDisplayName = (person) => {
+    if (isMe(person)) return 'You';
+    return person?.name || 'Unknown';
+  };
+
   const confirmRestore = (debt) => {
+    const debtorName = getDisplayName(debt.debtor);
+    const creditorName = getDisplayName(debt.creditor);
     Alert.alert(
       'Restore this transaction?',
-      `This will bring back "${debt.debtor?.name} owes ${debt.creditor?.name} ₹${debt.amount}" and re-balance.`,
+      `This will bring back "${debtorName} owes ${creditorName} ₹${debt.amount}" and re-balance.`,
       [
         { text: 'Cancel', style: 'cancel' },
         { text: 'Restore', onPress: () => { restoreDebt(debt.id).catch(() => {}); } },
@@ -48,8 +69,8 @@ const HistoryScreen = ({ navigation }) => {
           item.status === 'DELETED' ? (
             <TouchableOpacity onPress={() => confirmRestore(item)} activeOpacity={0.7}>
               <TransactionCard
-                debtor={item.debtor?.name}
-                creditor={item.creditor?.name}
+                debtor={getDisplayName(item.debtor)}
+                creditor={getDisplayName(item.creditor)}
                 amount={item.amount}
                 status={item.status}
                 note={item.deletedBy ? `Deleted · tap to restore` : 'Tap to restore'}
@@ -57,8 +78,8 @@ const HistoryScreen = ({ navigation }) => {
             </TouchableOpacity>
           ) : (
             <TransactionCard
-              debtor={item.debtor?.name}
-              creditor={item.creditor?.name}
+              debtor={getDisplayName(item.debtor)}
+              creditor={getDisplayName(item.creditor)}
               amount={item.amount}
               status={item.status}
             />

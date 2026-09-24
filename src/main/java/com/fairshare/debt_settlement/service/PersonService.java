@@ -155,7 +155,7 @@ public class PersonService {
                 .filter(Person::isActive) // a deactivated account isn't "on Settlement" any more
                 .collect(java.util.stream.Collectors.toList());
         java.util.Map<String, Person> phoneToPerson = foundPersons.stream()
-                .collect(java.util.stream.Collectors.toMap(Person::getPhoneNumber, p -> p));
+                .collect(java.util.stream.Collectors.toMap(Person::getPhoneNumber, p -> p, (p1, p2) -> p1));
 
         List<java.util.Map<String, Object>> results = new ArrayList<>();
         for (String original : phoneNumbers) {
