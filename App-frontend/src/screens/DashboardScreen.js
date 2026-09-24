@@ -172,11 +172,17 @@ const DashboardScreen = ({ navigation }) => {
   // YOU actually owe and are owed, even when the global optimizer routes around you.
   const myPhone = user?.phoneNumber;
 
+  const normalizePhone = (p) => (p || '').replace(/\D/g, '');
   const isMe = (person) => {
     if (!person || !user) return false;
-    if (person.id && user.id && person.id === user.id) return true;
-    if (person.phoneNumber && user.phoneNumber && person.phoneNumber === user.phoneNumber) return true;
+    if (person.id && user.id && String(person.id) === String(user.id)) return true;
+    if (person.phoneNumber && user.phoneNumber) {
+      const p1 = normalizePhone(person.phoneNumber);
+      const p2 = normalizePhone(user.phoneNumber);
+      if (p1 && p2 && (p1 === p2 || p1.endsWith(p2) || p2.endsWith(p1))) return true;
+    }
     if (person.email && user.email && person.email.toLowerCase() === user.email.toLowerCase()) return true;
+    if (person.name && user.name && person.name.trim().toLowerCase() === user.name.trim().toLowerCase()) return true;
     return false;
   };
 
