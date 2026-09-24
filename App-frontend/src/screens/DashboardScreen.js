@@ -58,30 +58,6 @@ const DashboardScreen = ({ navigation }) => {
     );
   };
 
-  const handleCancelWaiting = (debt) => {
-    Alert.alert(
-      'Cancel this request?',
-      `Are you sure you want to cancel the ₹${debt.amount} request sent to ${debt.debtor?.name || 'them'}?`,
-      [
-        { text: 'Keep', style: 'cancel' },
-        {
-          text: 'Cancel Request',
-          style: 'destructive',
-          onPress: async () => {
-            setActingOnId(debt.id);
-            try {
-              await deleteDebt(debt.id);
-            } catch (e) {
-              Alert.alert('Error', 'Could not cancel request. Please try again.');
-            } finally {
-              setActingOnId(null);
-            }
-          },
-        },
-      ]
-    );
-  };
-
   const handleRestore = async () => {
     if (!selectedDebt) return;
     setIsSubmitting(true);
@@ -335,28 +311,14 @@ const DashboardScreen = ({ navigation }) => {
             </View>
             <View style={styles.settlementList}>
               {waitingOnOthers.map((d, index) => (
-                <View key={d.id || index} style={styles.confirmItem}>
-                  <TransactionCard
-                    debtor={getDisplayName(d.debtor)}
-                    creditor={getDisplayName(d.creditor)}
-                    amount={d.amount}
-                    status="UNCONFIRMED"
-                    note={`Waiting for ${d.debtor?.name || 'them'} to accept`}
-                  />
-                  <View style={styles.confirmActions}>
-                    <TouchableOpacity
-                      style={[styles.confirmBtn, styles.declineBtn]}
-                      disabled={actingOnId === d.id}
-                      onPress={() => handleCancelWaiting(d)}
-                    >
-                      {actingOnId === d.id ? (
-                        <ActivityIndicator color={Theme.colors.danger} size="small" />
-                      ) : (
-                        <Text style={styles.declineText}>Cancel Request</Text>
-                      )}
-                    </TouchableOpacity>
-                  </View>
-                </View>
+                <TransactionCard
+                  key={d.id || index}
+                  debtor={getDisplayName(d.debtor)}
+                  creditor={getDisplayName(d.creditor)}
+                  amount={d.amount}
+                  status="UNCONFIRMED"
+                  note={`Waiting for ${d.debtor?.name || 'them'} to accept`}
+                />
               ))}
             </View>
           </View>
