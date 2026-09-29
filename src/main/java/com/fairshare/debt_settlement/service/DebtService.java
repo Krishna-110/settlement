@@ -47,7 +47,10 @@ public class DebtService {
         debt.setDebtor(debtor);
         debt.setCreditor(creditor);
         debt.setAmount(request.getAmount());
-        debt.setNote(request.getNote());
+        if (request.getNote() != null) {
+            String trimmed = request.getNote().trim();
+            debt.setNote(trimmed.isEmpty() ? null : trimmed);
+        }
         if (request.getGroupId() != null) {
             debt.setGroup(groupRepository.findById(request.getGroupId()).orElse(null));
         }
@@ -362,30 +365,42 @@ public class DebtService {
         return debtRepository.findAll();
     }
 
+    @org.springframework.transaction.annotation.Transactional
     public Debt updateDebt(Long id, CreateDebtRequest request) {
         if (id == null) throw new IllegalArgumentException("ID must not be null");
         Debt debt = debtRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Debt record not found"));
 
-        // Only an active (PENDING) transaction can be edited. Settled / declined / deleted rows are
-        // historical and must stay immutable.
-        if (!"PENDING".equals(debt.getStatus())) {
-            throw new IllegalArgumentException("Only pending transactions can be edited.");
+        // Only an active (PENDING) or unconfirmed (UNCONFIRMED) transaction can be edited.
+        // Settled / declined / deleted rows are historical and must stay immutable.
+        if (!"PENDING".equals(debt.getStatus()) && !"UNCONFIRMED".equals(debt.getStatus())) {
+            throw new IllegalArgumentException("Only pending or unconfirmed transactions can be edited.");
         }
 
-        String debtorPhone = normalizePhone(request.getDebtorPhone());
-        String creditorPhone = normalizePhone(request.getCreditorPhone());
+        if (request.getAmount() == null || request.getAmount() <= 0) {
+            throw new IllegalArgumentException("Amount must be greater than zero.");
+        }
 
-        Person debtor = personRepository.findByPhoneNumber(debtorPhone)
-                .orElseThrow(() -> new IllegalArgumentException("Debtor not found with phone: " + request.getDebtorPhone()));
-        Person creditor = personRepository.findByPhoneNumber(creditorPhone)
-                .orElseThrow(() -> new IllegalArgumentException("Creditor not found with phone: " + request.getCreditorPhone()));
+        Person debtor = resolvePerson(request.getDebtorId(), request.getDebtorPhone(), "Debtor");
+        Person creditor = resolvePerson(request.getCreditorId(), request.getCreditorPhone(), "Creditor");
+
+        if (debtor.getId().equals(creditor.getId())) {
+            throw new IllegalArgumentException("Debtor and creditor cannot be the same person.");
+        }
 
         debt.setDebtor(debtor);
         debt.setCreditor(creditor);
         debt.setAmount(request.getAmount());
+        if (request.getNote() != null) {
+            String trimmed = request.getNote().trim();
+            debt.setNote(trimmed.isEmpty() ? null : trimmed);
+        }
 
-        return debtRepository.save(debt);
+        Debt saved = debtRepository.save(debt);
+        if ("PENDING".equals(saved.getStatus())) {
+            simplifyConnectedComponents(debtor.getEmail());
+        }
+        return saved;
     }
 
     // Resolve a person by id when given (used when their phone is hidden), else by phone.

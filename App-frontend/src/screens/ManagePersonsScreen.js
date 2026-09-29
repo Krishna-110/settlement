@@ -1,10 +1,10 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput, Modal, Alert, ActivityIndicator, KeyboardAvoidingView, Platform, Share } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useStore } from '../store/useStore';
 import { Theme } from '../theme/Theme';
 import { Users, Trash2, Plus, X, RefreshCw, CheckCircle2, Search } from 'lucide-react-native';
-import { getDeviceContacts, normalizePhoneNumber } from '../services/ContactService';
+import { getDeviceContacts, normalizePhoneNumber, requestContactPermission, promptContactPermissionAgain, openAppSettings } from '../services/ContactService';
 import apiService from '../services/apiService';
 import { APP_WEBSITE, APP_DOWNLOAD_LINK } from '../config/links';
 
@@ -37,14 +37,27 @@ const ManagePersonsScreen = () => {
   const [viewMode, setViewMode] = useState('friends'); // 'friends' or 'contacts'
   const [searchQuery, setSearchQuery] = useState('');
 
+  const debounceTimerRef = useRef(null);
+  const abortControllerRef = useRef(null);
+
   useEffect(() => {
-    const delayDebounceFn = setTimeout(async () => {
-      const normalized = normalizePhoneNumber(newPhone);
-      if (normalized && normalized.length === 10) {
+    if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+    if (abortControllerRef.current) abortControllerRef.current.abort();
+
+    const normalized = normalizePhoneNumber(newPhone);
+    const currentUserPhone = normalizePhoneNumber(user?.phoneNumber);
+
+    if (normalized && currentUserPhone && normalized === currentUserPhone) {
+      setValidationMsg({ type: 'error', text: 'This is your own phone number.' });
+      return;
+    }
+
+    if (normalized && normalized.length === 10) {
+      debounceTimerRef.current = setTimeout(async () => {
         try {
-          // Re-using checkPersonExists but it needs to support phone now
-          // For now, I'll use the existing check but better if I had a phone check
-          const res = await apiService.checkBatchContacts([normalized]);
+          const controller = new AbortController();
+          abortControllerRef.current = controller;
+          const res = await apiService.checkBatchContacts([normalized], { signal: controller.signal });
           const contact = res[0];
           if (contact && contact.registered) {
             setValidationMsg({ type: 'success', text: `Registered User Found: ${contact.name}` });
@@ -53,15 +66,20 @@ const ManagePersonsScreen = () => {
             setValidationMsg({ type: 'info', text: 'User not registered. A placeholder will be created.' });
           }
         } catch (e) {
-          setValidationMsg(null);
+          if (e.name !== 'CanceledError' && e.name !== 'AbortError') {
+            setValidationMsg(null);
+          }
         }
-      } else {
-        setValidationMsg(null);
-      }
-    }, 800); // only fires once the user actually pauses typing
+      }, 800); // only fires once the user actually pauses typing
+    } else {
+      setValidationMsg(null);
+    }
 
-    return () => clearTimeout(delayDebounceFn);
-  }, [newPhone]);
+    return () => {
+      if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+      if (abortControllerRef.current) abortControllerRef.current.abort();
+    };
+  }, [newPhone, user?.phoneNumber]);
 
   useEffect(() => {
     fetchData();
@@ -71,6 +89,41 @@ const ManagePersonsScreen = () => {
     setIsSyncing(true);
     setSearchQuery('');
     try {
+      const perm = await requestContactPermission();
+      if (!perm.granted) {
+        setIsSyncing(false);
+        if (perm.canAskAgain) {
+          // Case 1: Can ask again -> Show friendly prompt and re-trigger OS permission prompt
+          Alert.alert(
+            'Contacts Access Needed',
+            'Settlement needs access to your contacts to help you find friends and split expenses easily.',
+            [
+              { text: 'Not Now', style: 'cancel' },
+              { 
+                text: 'Allow Access', 
+                onPress: async () => {
+                  const retry = await promptContactPermissionAgain();
+                  if (retry.status === 'granted') {
+                    handleSyncContacts();
+                  }
+                } 
+              }
+            ]
+          );
+        } else {
+          // Case 2: Permanently denied -> Show friendly prompt with 1-tap shortcut to Settings
+          Alert.alert(
+            'Permission Required',
+            "Don't worry, that just needs contact permission! Just allow Contacts under app settings, or tap the + Add button at the top to add a friend manually.",
+            [
+              { text: 'Cancel', style: 'cancel' },
+              { text: 'Open Settings', onPress: () => openAppSettings() }
+            ]
+          );
+        }
+        return;
+      }
+
       const contacts = await getDeviceContacts();
       if (contacts.length > 0) {
         const phoneNumbers = contacts.map(c => c.phoneNumber);
@@ -116,7 +169,10 @@ const ManagePersonsScreen = () => {
             : 'None of your contacts are on Settlement yet. Invite them from the Contacts tab!'
         );
       } else {
-        Alert.alert('No Contacts', 'No valid contacts with phone numbers found.');
+        Alert.alert(
+          'No Contacts Found',
+          'None of your saved contacts have a valid 10-digit mobile number. You can still add friends manually using the + Add button.'
+        );
       }
     } catch (error) {
       console.error(error);
@@ -140,6 +196,12 @@ const ManagePersonsScreen = () => {
   };
 
   const addFromContacts = async (contact) => {
+    const normalized = normalizePhoneNumber(contact.phoneNumber);
+    const currentUserPhone = normalizePhoneNumber(user?.phoneNumber);
+    if (normalized && currentUserPhone && normalized === currentUserPhone) {
+      Alert.alert('Cannot Add Yourself', 'You cannot add yourself to your Circle.');
+      return;
+    }
     setIsSubmitting(true);
     try {
       await addPerson({ 
@@ -149,7 +211,8 @@ const ManagePersonsScreen = () => {
       markContactAsFriend(contact.phoneNumber);
       await fetchData();
     } catch (error) {
-      Alert.alert('Error', 'Failed to add friend.');
+      const errMsg = error.response?.data?.message || error.message || 'Failed to add friend.';
+      Alert.alert('Error', errMsg);
     } finally {
       setIsSubmitting(false);
     }
@@ -157,12 +220,23 @@ const ManagePersonsScreen = () => {
 
   const handleAdd = async () => {
     if (!newName.trim() || !newPhone.trim() || isSubmitting) return;
+
+    const normalized = normalizePhoneNumber(newPhone.trim());
+    const currentUserPhone = normalizePhoneNumber(user?.phoneNumber);
+    if (normalized && currentUserPhone && normalized === currentUserPhone) {
+      Alert.alert('Cannot Add Yourself', 'You cannot add yourself to your Circle.');
+      return;
+    }
+
+    // Cancel any pending debounce timer or in-flight check immediately
+    if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+    if (abortControllerRef.current) abortControllerRef.current.abort();
     
     setIsSubmitting(true);
     try {
       await addPerson({ 
         name: newName.trim(), 
-        phoneNumber: normalizePhoneNumber(newPhone.trim()) 
+        phoneNumber: normalized 
       });
       setNewName('');
       setNewPhone('');
@@ -170,7 +244,8 @@ const ManagePersonsScreen = () => {
       setModalVisible(false);
       fetchData();
     } catch (error) {
-      Alert.alert('Error', 'Failed to add person.');
+      const errMsg = error.response?.data?.message || error.message || 'Failed to add person.';
+      Alert.alert('Error', errMsg);
     } finally {
       setIsSubmitting(false);
     }
@@ -415,7 +490,15 @@ const ManagePersonsScreen = () => {
             </View>
             
             {validationMsg && (
-              <Text style={[styles.validationText, { marginTop: Theme.spacing.sm, color: validationMsg.type === 'success' ? Theme.colors.primary : Theme.colors.textSecondary }]}>
+              <Text style={[
+                styles.validationText, 
+                { 
+                  marginTop: Theme.spacing.sm, 
+                  color: validationMsg.type === 'success' 
+                    ? Theme.colors.primary 
+                    : (validationMsg.type === 'error' ? Theme.colors.danger : Theme.colors.textSecondary) 
+                }
+              ]}>
                 {validationMsg.text}
               </Text>
             )}

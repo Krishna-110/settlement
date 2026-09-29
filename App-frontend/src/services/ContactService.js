@@ -1,4 +1,5 @@
 import * as Contacts from 'expo-contacts';
+import { Linking } from 'react-native';
 
 /**
  * Normalizes phone numbers to a 10-digit format.
@@ -13,6 +14,8 @@ export const normalizePhoneNumber = (phone) => {
   // If it starts with 91 and is longer than 10 digits, remove the 91 prefix
   if (cleaned.length > 10 && cleaned.startsWith('91')) {
     cleaned = cleaned.substring(cleaned.length - 10);
+  } else if (cleaned.length === 11 && cleaned.startsWith('0')) {
+    cleaned = cleaned.substring(1);
   }
   
   // Return the last 10 digits if it's a valid length, otherwise return null or original
@@ -24,19 +27,33 @@ export const normalizePhoneNumber = (phone) => {
 };
 
 /**
- * Requests contact permissions from the user.
+ * Requests contact permissions from the user, returning granted and canAskAgain status.
  */
 export const requestContactPermission = async () => {
-  const { status } = await Contacts.requestPermissionsAsync();
-  return status === 'granted';
+  try {
+    const current = await Contacts.getPermissionsAsync();
+    if (current.status === 'granted') {
+      return { granted: true, canAskAgain: current.canAskAgain };
+    }
+    if (current.canAskAgain) {
+      const res = await Contacts.requestPermissionsAsync();
+      return { granted: res.status === 'granted', canAskAgain: res.canAskAgain };
+    }
+    return { granted: false, canAskAgain: false };
+  } catch (e) {
+    console.warn('Contact permission error:', e);
+    return { granted: false, canAskAgain: true };
+  }
 };
 
 /**
  * Fetches and normalizes all contacts from the device.
  */
 export const getDeviceContacts = async () => {
-  const hasPermission = await requestContactPermission();
-  if (hasPermission) {
+  try {
+    const perm = await Contacts.getPermissionsAsync();
+    if (perm.status !== 'granted') return [];
+
     const { data } = await Contacts.getContactsAsync({
       fields: [Contacts.Fields.Name, Contacts.Fields.PhoneNumbers],
     });
@@ -63,6 +80,27 @@ export const getDeviceContacts = async () => {
       
       return Array.from(contactMap.values());
     }
+  } catch (e) {
+    console.warn('Error fetching device contacts:', e);
   }
   return [];
+};
+
+/**
+ * Re-triggers the native permission dialog when canAskAgain is true.
+ */
+export const promptContactPermissionAgain = async () => {
+  try {
+    return await Contacts.requestPermissionsAsync();
+  } catch (e) {
+    console.warn('Error requesting contact permission:', e);
+    return { status: 'denied', canAskAgain: false };
+  }
+};
+
+/**
+ * Opens device app settings when permissions are permanently disabled.
+ */
+export const openAppSettings = () => {
+  Linking.openSettings();
 };

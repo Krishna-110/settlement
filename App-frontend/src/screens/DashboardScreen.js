@@ -115,15 +115,18 @@ const DashboardScreen = ({ navigation }) => {
     setIsSubmitting(true);
     try {
       await updateDebt(selectedDebt.id, {
-        debtorPhone: selectedDebt.debtor.phoneNumber,
-        creditorPhone: selectedDebt.creditor.phoneNumber,
+        debtorPhone: selectedDebt.debtor?.phoneNumber,
+        creditorPhone: selectedDebt.creditor?.phoneNumber,
+        debtorId: selectedDebt.debtor?.id,
+        creditorId: selectedDebt.creditor?.id,
         amount: parseFloat(editAmount),
         note: editNote
       });
       setSelectedDebt(null);
       Alert.alert('Success', 'Transaction updated!');
     } catch (error) {
-      Alert.alert('Error', 'Failed to update transaction.');
+      const msg = error.response?.data?.message || error.message || 'Failed to update transaction.';
+      Alert.alert('Error', msg);
     } finally {
       setIsSubmitting(false);
     }
@@ -131,16 +134,26 @@ const DashboardScreen = ({ navigation }) => {
 
   const handleDelete = () => {
     if (!selectedDebt) return;
-    Alert.alert('Confirm Delete', 'Are you sure you want to delete this transaction?', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: async () => {
-          setIsSubmitting(true);
-          try {
-            await deleteDebt(selectedDebt.id);
-            setSelectedDebt(null);
-          } catch(err) {} finally { setIsSubmitting(false); }
-      }}
-    ]);
+    const isUnconfirmed = selectedDebt.status === 'UNCONFIRMED';
+    Alert.alert(
+      isUnconfirmed ? 'Cancel Request' : 'Confirm Delete',
+      isUnconfirmed
+        ? 'Are you sure you want to cancel this pending request?'
+        : 'Are you sure you want to delete this transaction?',
+      [
+        { text: 'Keep', style: 'cancel' },
+        { text: isUnconfirmed ? 'Cancel Request' : 'Delete', style: 'destructive', onPress: async () => {
+            setIsSubmitting(true);
+            try {
+              await deleteDebt(selectedDebt.id);
+              setSelectedDebt(null);
+            } catch(err) {
+              const msg = err.response?.data?.message || err.message || 'Failed to delete transaction.';
+              Alert.alert('Error', msg);
+            } finally { setIsSubmitting(false); }
+        }}
+      ]
+    );
   };
 
   // The user's OWN position, computed from the real debts (netted per person). This is
@@ -311,14 +324,15 @@ const DashboardScreen = ({ navigation }) => {
             </View>
             <View style={styles.settlementList}>
               {waitingOnOthers.map((d, index) => (
-                <TransactionCard
-                  key={d.id || index}
-                  debtor={getDisplayName(d.debtor)}
-                  creditor={getDisplayName(d.creditor)}
-                  amount={d.amount}
-                  status="UNCONFIRMED"
-                  note={`Waiting for ${d.debtor?.name || 'them'} to accept`}
-                />
+                <TouchableOpacity key={d.id || index} onPress={() => openEditModal(d)} activeOpacity={0.8}>
+                  <TransactionCard
+                    debtor={getDisplayName(d.debtor)}
+                    creditor={getDisplayName(d.creditor)}
+                    amount={d.amount}
+                    status="UNCONFIRMED"
+                    note={d.note ? `${d.note} · Waiting for ${d.debtor?.name || 'them'} to accept` : `Waiting for ${d.debtor?.name || 'them'} to accept · tap to edit`}
+                  />
+                </TouchableOpacity>
               ))}
             </View>
           </View>
@@ -419,7 +433,9 @@ const DashboardScreen = ({ navigation }) => {
                 </>
               ) : (
                 <>
-                  <Text style={styles.modalTitle}>Edit Transaction</Text>
+                  <Text style={styles.modalTitle}>
+                    {selectedDebt?.status === 'UNCONFIRMED' ? 'Edit Request' : 'Edit Transaction'}
+                  </Text>
 
                   {selectedDebt && (
                     <Text style={styles.modalSubtitle}>
@@ -452,7 +468,9 @@ const DashboardScreen = ({ navigation }) => {
 
                   <View style={styles.modalActions}>
                     <TouchableOpacity style={[styles.actionBtn, styles.deleteBtn]} onPress={handleDelete} disabled={isSubmitting}>
-                      <Text style={styles.deleteBtnText}>Delete</Text>
+                      <Text style={styles.deleteBtnText}>
+                        {selectedDebt?.status === 'UNCONFIRMED' ? 'Cancel Request' : 'Delete'}
+                      </Text>
                     </TouchableOpacity>
 
                     <TouchableOpacity style={[styles.actionBtn, styles.saveBtn]} onPress={handleUpdate} disabled={isSubmitting}>

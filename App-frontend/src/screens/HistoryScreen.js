@@ -1,5 +1,5 @@
-import React from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert, Modal, TextInput, ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useStore } from '../store/useStore';
 import { Theme } from '../theme/Theme';
@@ -7,7 +7,11 @@ import { ChevronLeft, ListFilter } from 'lucide-react-native';
 import TransactionCard from '../components/TransactionCard';
 
 const HistoryScreen = ({ navigation }) => {
-  const { debts, user, restoreDebt } = useStore();
+  const { debts, user, restoreDebt, updateDebt, deleteDebt } = useStore();
+  const [selectedDebt, setSelectedDebt] = useState(null);
+  const [editAmount, setEditAmount] = useState('');
+  const [editNote, setEditNote] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const safeDebts = Array.isArray(debts) ? debts : [];
   const userDebts = safeDebts
@@ -34,17 +38,84 @@ const HistoryScreen = ({ navigation }) => {
     return person?.name || 'Unknown';
   };
 
-  const confirmRestore = (debt) => {
-    const debtorName = getDisplayName(debt.debtor);
-    const creditorName = getDisplayName(debt.creditor);
+  const openEditModal = (debt) => {
+    if (debt.status === 'SETTLED' || debt.status === 'DECLINED') {
+      Alert.alert('Locked', `This transaction is ${debt.status.toLowerCase()} and can no longer be edited.`);
+      return;
+    }
+    setSelectedDebt(debt);
+    setEditAmount(debt.amount ? debt.amount.toString() : '');
+    setEditNote(debt.note || '');
+  };
+
+  const handleUpdate = async () => {
+    if (!selectedDebt || !editAmount || isNaN(parseFloat(editAmount))) {
+      Alert.alert('Invalid', 'Please enter a valid amount.');
+      return;
+    }
+    
+    setIsSubmitting(true);
+    try {
+      await updateDebt(selectedDebt.id, {
+        debtorPhone: selectedDebt.debtor?.phoneNumber,
+        creditorPhone: selectedDebt.creditor?.phoneNumber,
+        debtorId: selectedDebt.debtor?.id,
+        creditorId: selectedDebt.creditor?.id,
+        amount: parseFloat(editAmount),
+        note: editNote
+      });
+      setSelectedDebt(null);
+      Alert.alert('Success', 'Transaction updated!');
+    } catch (error) {
+      const msg = error.response?.data?.message || error.message || 'Failed to update transaction.';
+      Alert.alert('Error', msg);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleDelete = () => {
+    if (!selectedDebt) return;
+    const isUnconfirmed = selectedDebt.status === 'UNCONFIRMED';
     Alert.alert(
-      'Restore this transaction?',
-      `This will bring back "${debtorName} owes ${creditorName} ₹${debt.amount}" and re-balance.`,
+      isUnconfirmed ? 'Cancel Request' : 'Confirm Delete',
+      isUnconfirmed
+        ? 'Are you sure you want to cancel this pending request?'
+        : 'Are you sure you want to delete this transaction?',
       [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Restore', onPress: () => { restoreDebt(debt.id).catch(() => {}); } },
+        { text: 'Keep', style: 'cancel' },
+        { 
+          text: isUnconfirmed ? 'Cancel Request' : 'Delete', 
+          style: 'destructive', 
+          onPress: async () => {
+            setIsSubmitting(true);
+            try {
+              await deleteDebt(selectedDebt.id);
+              setSelectedDebt(null);
+            } catch(err) {
+              const msg = err.response?.data?.message || err.message || 'Failed to delete transaction.';
+              Alert.alert('Error', msg);
+            } finally { 
+              setIsSubmitting(false); 
+            }
+          }
+        }
       ]
     );
+  };
+
+  const handleRestore = async () => {
+    if (!selectedDebt) return;
+    setIsSubmitting(true);
+    try {
+      await restoreDebt(selectedDebt.id);
+      setSelectedDebt(null);
+    } catch(err) {
+      const msg = err.response?.data?.message || err.message || 'Failed to restore transaction.';
+      Alert.alert('Error', msg);
+    } finally { 
+      setIsSubmitting(false); 
+    }
   };
 
   return (
@@ -66,24 +137,15 @@ const HistoryScreen = ({ navigation }) => {
         data={userDebts}
         keyExtractor={(item) => item.id.toString()}
         renderItem={({ item }) => (
-          item.status === 'DELETED' ? (
-            <TouchableOpacity onPress={() => confirmRestore(item)} activeOpacity={0.7}>
-              <TransactionCard
-                debtor={getDisplayName(item.debtor)}
-                creditor={getDisplayName(item.creditor)}
-                amount={item.amount}
-                status={item.status}
-                note={item.deletedBy ? `Deleted · tap to restore` : 'Tap to restore'}
-              />
-            </TouchableOpacity>
-          ) : (
+          <TouchableOpacity onPress={() => openEditModal(item)} activeOpacity={0.7}>
             <TransactionCard
               debtor={getDisplayName(item.debtor)}
               creditor={getDisplayName(item.creditor)}
               amount={item.amount}
               status={item.status}
+              note={item.status === 'DELETED' ? (item.deletedBy ? `Deleted · tap to restore` : 'Tap to restore') : item.note}
             />
-          )
+          </TouchableOpacity>
         )}
         contentContainerStyle={styles.list}
         showsVerticalScrollIndicator={false}
@@ -93,6 +155,86 @@ const HistoryScreen = ({ navigation }) => {
           </View>
         }
       />
+
+      {/* Edit Debt Modal */}
+      <Modal visible={!!selectedDebt} animationType="slide" transparent={true} onRequestClose={() => setSelectedDebt(null)}>
+        <KeyboardAvoidingView 
+          behavior={Platform.OS === 'ios' ? 'padding' : 'padding'} 
+          style={{ flex: 1 }}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              {selectedDebt?.status === 'DELETED' ? (
+                <>
+                  <Text style={styles.modalTitle}>Restore Transaction</Text>
+                  <Text style={styles.modalSubtitle}>
+                    This entry was deleted{selectedDebt?.deletedBy ? ` by ${selectedDebt.deletedBy}` : ''}. Restore it to bring the debt back and re-balance.
+                  </Text>
+                  <View style={styles.modalActions}>
+                    <TouchableOpacity style={[styles.actionBtn, styles.deleteBtn]} onPress={() => setSelectedDebt(null)} disabled={isSubmitting}>
+                      <Text style={styles.deleteBtnText}>Cancel</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={[styles.actionBtn, styles.saveBtn]} onPress={handleRestore} disabled={isSubmitting}>
+                      {isSubmitting ? <ActivityIndicator color={Theme.colors.white} /> : <Text style={styles.saveBtnText}>Restore</Text>}
+                    </TouchableOpacity>
+                  </View>
+                </>
+              ) : (
+                <>
+                  <Text style={styles.modalTitle}>
+                    {selectedDebt?.status === 'UNCONFIRMED' ? 'Edit Request' : 'Edit Transaction'}
+                  </Text>
+
+                  {selectedDebt && (
+                    <Text style={styles.modalSubtitle}>
+                      {selectedDebt.creditor?.name} paid for {selectedDebt.debtor?.name}
+                    </Text>
+                  )}
+
+                  <Text style={styles.label}>Amount</Text>
+                  <View style={styles.inputContainer}>
+                    <Text style={styles.currencyPrefix}>₹</Text>
+                    <TextInput
+                      style={styles.input}
+                      keyboardType="numeric"
+                      value={editAmount}
+                      onChangeText={setEditAmount}
+                      editable={!isSubmitting}
+                    />
+                  </View>
+
+                  <Text style={styles.label}>Note</Text>
+                  <View style={styles.inputContainer}>
+                    <TextInput
+                      style={styles.input}
+                      value={editNote}
+                      onChangeText={setEditNote}
+                      editable={!isSubmitting}
+                      placeholder="Optional Note"
+                    />
+                  </View>
+
+                  <View style={styles.modalActions}>
+                    <TouchableOpacity style={[styles.actionBtn, styles.deleteBtn]} onPress={handleDelete} disabled={isSubmitting}>
+                      <Text style={styles.deleteBtnText}>
+                        {selectedDebt?.status === 'UNCONFIRMED' ? 'Cancel Request' : 'Delete'}
+                      </Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity style={[styles.actionBtn, styles.saveBtn]} onPress={handleUpdate} disabled={isSubmitting}>
+                      {isSubmitting ? <ActivityIndicator color={Theme.colors.white} /> : <Text style={styles.saveBtnText}>Save</Text>}
+                    </TouchableOpacity>
+                  </View>
+
+                  <TouchableOpacity style={styles.closeModalBtn} onPress={() => setSelectedDebt(null)}>
+                    <Text style={styles.closeModalText}>Cancel</Text>
+                  </TouchableOpacity>
+                </>
+              )}
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </SafeAreaView>
   );
 };
@@ -152,6 +294,97 @@ const styles = StyleSheet.create({
   emptyText: {
     color: Theme.colors.textSecondary,
     fontSize: 14,
+    fontWeight: '600',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: Theme.colors.white,
+    borderTopLeftRadius: Theme.borderRadius.xl,
+    borderTopRightRadius: Theme.borderRadius.xl,
+    padding: Theme.spacing.xl,
+    paddingBottom: 40,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: Theme.colors.text,
+    textAlign: 'center',
+    marginBottom: Theme.spacing.xs,
+  },
+  modalSubtitle: {
+    fontSize: 14,
+    color: Theme.colors.textSecondary,
+    textAlign: 'center',
+    marginBottom: Theme.spacing.lg,
+  },
+  label: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: Theme.colors.text,
+    marginBottom: Theme.spacing.xs,
+    marginTop: Theme.spacing.md,
+  },
+  inputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Theme.colors.surface,
+    padding: Theme.spacing.md,
+    borderRadius: Theme.borderRadius.lg,
+    borderWidth: 1,
+    borderColor: Theme.colors.border,
+  },
+  currencyPrefix: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: Theme.colors.text,
+    marginRight: 8,
+  },
+  input: {
+    flex: 1,
+    fontSize: 16,
+    color: Theme.colors.text,
+  },
+  modalActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: Theme.spacing.xl,
+  },
+  actionBtn: {
+    flex: 1,
+    padding: Theme.spacing.md,
+    borderRadius: Theme.borderRadius.lg,
+    alignItems: 'center',
+  },
+  deleteBtn: {
+    backgroundColor: Theme.colors.surface,
+    marginRight: Theme.spacing.sm,
+    borderWidth: 1,
+    borderColor: Theme.colors.danger,
+  },
+  deleteBtnText: {
+    color: Theme.colors.danger,
+    fontWeight: '700',
+    fontSize: 16,
+  },
+  saveBtn: {
+    backgroundColor: Theme.colors.primary,
+    marginLeft: Theme.spacing.sm,
+  },
+  saveBtnText: {
+    color: Theme.colors.white,
+    fontWeight: '700',
+    fontSize: 16,
+  },
+  closeModalBtn: {
+    marginTop: Theme.spacing.lg,
+    alignItems: 'center',
+  },
+  closeModalText: {
+    color: Theme.colors.textSecondary,
     fontWeight: '600',
   },
 });

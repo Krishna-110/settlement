@@ -44,27 +44,51 @@ public class PersonService {
         String normalizedPhone = normalizePhoneNumber(request.getPhoneNumber());
 
         if (normalizedPhone != null && !normalizedPhone.isEmpty()) {
+            String myNormalizedPhone = normalizePhoneNumber(currentUser.getPhoneNumber());
+            if (myNormalizedPhone != null && myNormalizedPhone.equals(normalizedPhone)) {
+                throw new IllegalArgumentException("You cannot add yourself to your Circle");
+            }
             Optional<Person> existingPerson = personRepository.findByPhoneNumber(normalizedPhone);
             if (existingPerson.isPresent()) {
                 friendToAdd = existingPerson.get();
+                if (friendToAdd.getId() != null && friendToAdd.getId().equals(currentUser.getId())) {
+                    throw new IllegalArgumentException("You cannot add yourself to your Circle");
+                }
             } else {
-                friendToAdd = new Person();
-                friendToAdd.setName(request.getName().trim());
-                friendToAdd.setPhoneNumber(normalizedPhone);
-                // Assign a temporary email since it is required and unique
-                friendToAdd.setEmail("phone_" + normalizedPhone + "@cleardues.local");
-                friendToAdd = personRepository.save(friendToAdd);
-                personRepository.flush(); // Ensure ID is generated for friendship link
+                String tempEmail = "phone_" + normalizedPhone + "@cleardues.local";
+                Optional<Person> existingByEmail = personRepository.findByEmail(tempEmail);
+                if (existingByEmail.isPresent()) {
+                    friendToAdd = existingByEmail.get();
+                    if (friendToAdd.getPhoneNumber() == null || friendToAdd.getPhoneNumber().isEmpty()) {
+                        friendToAdd.setPhoneNumber(normalizedPhone);
+                        personRepository.save(friendToAdd);
+                    }
+                } else {
+                    friendToAdd = new Person();
+                    friendToAdd.setName(request.getName().trim());
+                    friendToAdd.setPhoneNumber(normalizedPhone);
+                    // Assign a temporary email since it is required and unique
+                    friendToAdd.setEmail(tempEmail);
+                    friendToAdd = personRepository.save(friendToAdd);
+                    personRepository.flush(); // Ensure ID is generated for friendship link
+                }
             }
         } else if (request.getEmail() != null && !request.getEmail().trim().isEmpty()) {
-            Optional<Person> existingPerson = personRepository.findByEmail(request.getEmail().trim());
+            String email = request.getEmail().trim();
+            if (currentUser.getEmail() != null && currentUser.getEmail().equalsIgnoreCase(email)) {
+                throw new IllegalArgumentException("You cannot add yourself to your Circle");
+            }
+            Optional<Person> existingPerson = personRepository.findByEmail(email);
             if (existingPerson.isPresent()) {
                 friendToAdd = existingPerson.get();
+                if (friendToAdd.getId() != null && friendToAdd.getId().equals(currentUser.getId())) {
+                    throw new IllegalArgumentException("You cannot add yourself to your Circle");
+                }
             } else {
                 // Create placeholder person with real email
                 friendToAdd = new Person();
                 friendToAdd.setName(request.getName().trim());
-                friendToAdd.setEmail(request.getEmail().trim());
+                friendToAdd.setEmail(email);
                 friendToAdd = personRepository.save(friendToAdd);
                 personRepository.flush();
             }
@@ -133,7 +157,9 @@ public class PersonService {
         // adding a not-yet-saved entity into a HashSet<Person> (friends) would silently misbehave.
         java.util.Objects.requireNonNull(a.getId(), "person a must be persisted before befriending");
         java.util.Objects.requireNonNull(b.getId(), "person b must be persisted before befriending");
-        if (a.getId().equals(b.getId())) return;
+        if (a.getId().equals(b.getId())) {
+            throw new IllegalArgumentException("You cannot add yourself to your Circle");
+        }
         
         boolean alreadyFriends = a.getFriends().stream()
                 .anyMatch(f -> f.getId().equals(b.getId()));

@@ -241,4 +241,29 @@ class PersonServiceTest {
         verify(groupRepository).save(group);
         verify(personRepository).delete(placeholder);
     }
+
+    @Test
+    void addPerson_whenAddingSelfByPhone_throwsIllegalArgument() {
+        me.setPhoneNumber("9876543210");
+        com.fairshare.debt_settlement.dto.CreatePersonRequest req =
+                new com.fairshare.debt_settlement.dto.CreatePersonRequest();
+        req.setName("Me Again");
+        req.setPhoneNumber("9876543210");
+
+        assertThatThrownBy(() -> personService.addPerson(req))
+                .isExactlyInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("You cannot add yourself to your Circle");
+    }
+
+    @Test
+    void addPerson_whenAddingSelfByEmail_throwsIllegalArgument() {
+        com.fairshare.debt_settlement.dto.CreatePersonRequest req =
+                new com.fairshare.debt_settlement.dto.CreatePersonRequest();
+        req.setName("Me Again");
+        req.setEmail("me@example.com");
+
+        assertThatThrownBy(() -> personService.addPerson(req))
+                .isExactlyInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("You cannot add yourself to your Circle");
+    }
 }

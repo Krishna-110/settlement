@@ -8,6 +8,7 @@ const API_BASE_URL = `${BACKEND_URL}/api`;
 
 const api = axios.create({
   baseURL: API_BASE_URL,
+  timeout: 10000,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -41,6 +42,9 @@ api.interceptors.response.use(
     return response;
   },
   async (error) => {
+    if (error.code === 'ECONNABORTED' || error.message?.toLowerCase().includes('timeout')) {
+      error.message = 'Request timed out. Please check your internet connection.';
+    }
     if (error.response && error.response.status === 401) {
       // Logic for force logout can be added here
       await authStorage.removeToken();
@@ -162,8 +166,8 @@ export const apiService = {
     const response = await api.post('/persons/sync-batch', contacts);
     return response.data;
   },
-  checkBatchContacts: async (phoneNumbers) => {
-    const response = await api.post('/persons/check-contacts', phoneNumbers);
+  checkBatchContacts: async (phoneNumbers, config = {}) => {
+    const response = await api.post('/persons/check-contacts', phoneNumbers, config);
     return response.data;
   },
 };
