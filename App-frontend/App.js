@@ -17,6 +17,7 @@ import SettlementScreen from './src/screens/SettlementScreen';
 import ManagePersonsScreen from './src/screens/ManagePersonsScreen';
 import HistoryScreen from './src/screens/HistoryScreen';
 import AccountScreen from './src/screens/AccountScreen';
+import FirstLaunchNotice from './src/components/FirstLaunchNotice';
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
@@ -206,6 +207,7 @@ export default function App() {
             )}
           </Stack.Navigator>
         </NavigationContainer>
+        <FirstLaunchNotice />
       </ErrorBoundary>
     </SafeAreaProvider>
   );

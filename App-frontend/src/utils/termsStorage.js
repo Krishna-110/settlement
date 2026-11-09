@@ -1,6 +1,8 @@
 import * as SecureStore from 'expo-secure-store';
 
-const TERMS_KEY = 'terms_accepted';
+// v2: acceptance now also covers the first-launch disclaimer (FirstLaunchNotice). The key
+// changed from 'terms_accepted' so users who only ticked the old checkbox see the notice once.
+const TERMS_KEY = 'terms_and_notice_accepted';
 
 // Persists whether the user has accepted the Terms & Conditions, so they aren't asked
 // again on every app open once agreed (mirrors the pattern used by authStorage.js).

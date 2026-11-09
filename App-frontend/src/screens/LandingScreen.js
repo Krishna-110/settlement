@@ -2,11 +2,10 @@ import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Dimensions, Animated, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Theme } from '../theme/Theme';
-import { ChevronRight, Check } from 'lucide-react-native';
+import { ChevronRight } from 'lucide-react-native';
 import Logo from '../components/Logo';
 import TermsModal from '../components/TermsModal';
 import PrivacyModal from '../components/PrivacyModal';
-import termsStorage from '../utils/termsStorage';
 import * as WebBrowserInstance from 'expo-web-browser';
 import * as Linking from 'expo-linking';
 import apiService from '../services/apiService';
@@ -20,7 +19,6 @@ const { width, height } = Dimensions.get('window');
 const LandingScreen = () => {
   const { setAuthenticated, checkAuth } = useStore();
   const [isAuthenticating, setIsAuthenticating] = useState(false);
-  const [termsAccepted, setTermsAccepted] = useState(false);
   const [termsModalVisible, setTermsModalVisible] = useState(false);
   const [privacyModalVisible, setPrivacyModalVisible] = useState(false);
 
@@ -33,9 +31,6 @@ const LandingScreen = () => {
   useEffect(() => {
     // Check if already authenticated on mount
     checkAuth();
-    // Restore any previously-given Terms & Conditions acceptance, so returning users
-    // aren't forced to re-check the box every time they land here.
-    termsStorage.getAccepted().then(setTermsAccepted);
 
     // Content entrance
     Animated.parallel([
@@ -77,14 +72,8 @@ const LandingScreen = () => {
   // replaces 'Landing' on its own. Calling navigate here raced that swap and could fire before
   // 'Main' was registered, which React Navigation reports as an unhandled action.
 
-  const toggleTermsAccepted = () => {
-    const next = !termsAccepted;
-    setTermsAccepted(next);
-    termsStorage.setAccepted(next);
-  };
-
   const handleGetStarted = async () => {
-    if (isAuthenticating || !termsAccepted) return;
+    if (isAuthenticating) return;
 
     setIsAuthenticating(true);
     const authUrl = apiService.getAuthUrl();
@@ -154,31 +143,15 @@ const LandingScreen = () => {
           </View>
 
           <View style={styles.buttonWrapper}>
-            <TouchableOpacity style={styles.termsRow} onPress={toggleTermsAccepted} activeOpacity={0.7}>
-              <View style={[styles.checkbox, termsAccepted && styles.checkboxChecked]}>
-                {termsAccepted && <Check size={14} color={Theme.colors.white} strokeWidth={3} />}
-              </View>
-              <Text style={styles.termsText}>
-                I agree to the{' '}
-                <Text style={styles.termsLink} onPress={() => setTermsModalVisible(true)}>
-                  Terms & Conditions
-                </Text>
-                {' '}and{' '}
-                <Text style={styles.termsLink} onPress={() => setPrivacyModalVisible(true)}>
-                  Privacy Policy
-                </Text>
-              </Text>
-            </TouchableOpacity>
-
             <TouchableOpacity
               activeOpacity={0.9}
               style={[
                 styles.button,
                 Theme.shadow.medium,
-                (isAuthenticating || !termsAccepted) && { opacity: 0.5 }
+                isAuthenticating && { opacity: 0.5 }
               ]}
               onPress={handleGetStarted}
-              disabled={isAuthenticating || !termsAccepted}
+              disabled={isAuthenticating}
             >
               <Text style={styles.buttonText}>
                 {isAuthenticating ? 'Authenticating...' : 'Get Started'}
@@ -191,6 +164,17 @@ const LandingScreen = () => {
                 )}
               </View>
             </TouchableOpacity>
+
+            {/* Acceptance happens in FirstLaunchNotice; these stay for reference. */}
+            <Text style={styles.termsText}>
+              <Text style={styles.termsLink} onPress={() => setTermsModalVisible(true)}>
+                Terms & Conditions
+              </Text>
+              {'  •  '}
+              <Text style={styles.termsLink} onPress={() => setPrivacyModalVisible(true)}>
+                Privacy Policy
+              </Text>
+            </Text>
           </View>
         </Animated.View>
       </View>
@@ -289,29 +273,11 @@ const styles = StyleSheet.create({
     width: '100%',
     paddingHorizontal: Theme.spacing.md,
   },
-  termsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: Theme.spacing.md,
-  },
-  checkbox: {
-    width: 20,
-    height: 20,
-    borderRadius: 6,
-    borderWidth: 2,
-    borderColor: Theme.colors.border,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 8,
-  },
-  checkboxChecked: {
-    backgroundColor: Theme.colors.primary,
-    borderColor: Theme.colors.primary,
-  },
   termsText: {
     fontSize: 13,
     color: Theme.colors.textSecondary,
+    textAlign: 'center',
+    marginTop: Theme.spacing.md,
   },
   termsLink: {
     color: Theme.colors.primary,
