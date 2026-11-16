@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { Theme } from '../theme/Theme';
+import { parseNoteTag } from '../utils/transactionTags';
 
 const TransactionCard = ({ debtor, creditor, amount, status, note }) => {
   const debtorName = debtor || 'Unknown';
@@ -11,6 +12,8 @@ const TransactionCard = ({ debtor, creditor, amount, status, note }) => {
   const isDeclined = status === 'DECLINED';
   const isDeleted = status === 'DELETED';
   const isMuted = isSettled || isDeclined || isDeleted; // inactive -> greyed / struck-through
+
+  const { tag, tagInfo, comment } = parseNoteTag(note);
 
   const isDebtorYou = debtorName.trim().toLowerCase() === 'you';
   const isCreditorYou = creditorName.trim().toLowerCase() === 'you';
@@ -66,10 +69,23 @@ const TransactionCard = ({ debtor, creditor, amount, status, note }) => {
       </View>
       </View>
 
-      {/* Flows inside the card. It used to be absolutely positioned with bottom:-8, which made
-          long notes hang outside the card and overlap the section heading below it. */}
+      {/* Flows inside the card. Tag badge + comment or fallback note text */}
       {note ? (
-        <Text style={styles.noteText} numberOfLines={2}>{note}</Text>
+        tag ? (
+          <View style={styles.noteRow}>
+            <View style={[styles.tagBadge, isMuted && styles.settledTagBadge]}>
+              <Text style={styles.tagBadgeIcon}>{tagInfo?.icon}</Text>
+              <Text style={[styles.tagBadgeText, isMuted && styles.settledText]}>{tag}</Text>
+            </View>
+            {comment ? (
+              <Text style={[styles.commentText, isMuted && styles.settledText]} numberOfLines={2}>
+                {comment}
+              </Text>
+            ) : null}
+          </View>
+        ) : (
+          <Text style={[styles.noteText, isMuted && styles.settledText]} numberOfLines={2}>{note}</Text>
+        )
       ) : null}
     </View>
   );
@@ -225,6 +241,46 @@ const styles = StyleSheet.create({
     paddingTop: Theme.spacing.sm,
     borderTopWidth: 1,
     borderTopColor: Theme.colors.border + '40',
+  },
+  noteRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: Theme.spacing.sm,
+    paddingTop: Theme.spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: Theme.colors.border + '40',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  tagBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Theme.colors.primary + '18',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: Theme.colors.primary + '30',
+  },
+  settledTagBadge: {
+    backgroundColor: Theme.colors.border + '50',
+    borderColor: Theme.colors.border,
+  },
+  tagBadgeIcon: {
+    fontSize: 11,
+    marginRight: 4,
+  },
+  tagBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: Theme.colors.primary,
+  },
+  commentText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: Theme.colors.textSecondary,
+    fontStyle: 'italic',
+    flexShrink: 1,
   },
 });
 

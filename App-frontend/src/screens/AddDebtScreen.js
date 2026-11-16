@@ -4,13 +4,15 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useStore } from '../store/useStore';
 import { Theme } from '../theme/Theme';
 import { Save, UserCircle, ChevronDown, Paperclip, UserPlus } from 'lucide-react-native';
+import { TRANSACTION_TAGS, formatNoteWithTag } from '../utils/transactionTags';
 
 const AddDebtScreen = ({ navigation }) => {
   const { persons, groups, addDebt, fetchData, user } = useStore();
   const [iPaid, setIPaid] = useState(true); // true = "I paid" (you're the creditor); false = "I owe"
   const [otherPerson, setOtherPerson] = useState(null);
   const [amount, setAmount] = useState('');
-  const [note, setNote] = useState('');
+  const [selectedTag, setSelectedTag] = useState(null);
+  const [comment, setComment] = useState('');
   const [groupId, setGroupId] = useState(null);
   const [showPersonModal, setShowPersonModal] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -22,19 +24,21 @@ const AddDebtScreen = ({ navigation }) => {
   const submitDebt = async () => {
     setIsSubmitting(true);
     try {
+      const finalNote = formatNoteWithTag(selectedTag, comment);
       await addDebt({
         debtorPhone: debtor.phoneNumber,
         creditorPhone: creditor.phoneNumber,
         debtorId: debtor.id,
         creditorId: creditor.id,
         amount: parseFloat(amount),
-        note: note,
+        note: finalNote,
         groupId: groupId,
       });
       fetchData();
       const friendName = otherPerson?.name || 'them';
       setAmount('');
-      setNote('');
+      setSelectedTag(null);
+      setComment('');
       setOtherPerson(null);
       Alert.alert(
         'Success',
@@ -147,15 +151,41 @@ const AddDebtScreen = ({ navigation }) => {
             />
           </View>
 
-          {/* Note (Optional) */}
-          <Text style={styles.label}>Note / Category (Optional)</Text>
+          {/* Category Tag (Optional) */}
+          <Text style={styles.label}>Category Tag (Optional)</Text>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.tagScroll}
+          >
+            {TRANSACTION_TAGS.map((t) => {
+              const isSelected = selectedTag === t.id;
+              return (
+                <TouchableOpacity
+                  key={t.id}
+                  style={[styles.tagChip, isSelected && styles.tagChipActive]}
+                  onPress={() => setSelectedTag(isSelected ? null : t.id)}
+                  disabled={isSubmitting}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.tagIcon}>{t.icon}</Text>
+                  <Text style={[styles.tagText, isSelected && styles.tagTextActive]}>
+                    {t.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+
+          {/* Comment / Note (Optional) */}
+          <Text style={styles.label}>Comment / Note (Optional)</Text>
           <View style={styles.inputContainer}>
             <Paperclip size={18} color={Theme.colors.textSecondary} style={{ marginRight: 8 }} />
             <TextInput
               style={styles.input}
-              placeholder="e.g. Dinner, Rent, Movies"
-              value={note}
-              onChangeText={setNote}
+              placeholder={selectedTag ? `Add details for ${selectedTag}...` : "e.g. Dinner, Rent, Movies"}
+              value={comment}
+              onChangeText={setComment}
               editable={!isSubmitting}
             />
           </View>
@@ -332,6 +362,38 @@ const styles = StyleSheet.create({
   },
   placeholder: {
     color: Theme.colors.textSecondary,
+  },
+  tagScroll: {
+    flexDirection: 'row',
+    paddingVertical: Theme.spacing.xs,
+    marginBottom: Theme.spacing.sm,
+  },
+  tagChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Theme.colors.surface,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: Theme.borderRadius.full,
+    borderWidth: 1,
+    borderColor: Theme.colors.border,
+    marginRight: 8,
+  },
+  tagChipActive: {
+    backgroundColor: Theme.colors.primary,
+    borderColor: Theme.colors.primary,
+  },
+  tagIcon: {
+    fontSize: 14,
+    marginRight: 6,
+  },
+  tagText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: Theme.colors.text,
+  },
+  tagTextActive: {
+    color: Theme.colors.white,
   },
   groupChips: {
     flexDirection: 'row',

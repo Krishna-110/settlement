@@ -10,13 +10,15 @@ import TransactionCard from '../components/TransactionCard';
 import { Bell, HandCoins, LogOut } from 'lucide-react-native';
 import PhoneOnboardingModal from '../components/PhoneOnboardingModal';
 import { requestContactPermission } from '../services/ContactService';
+import { TRANSACTION_TAGS, formatNoteWithTag, parseNoteTag } from '../utils/transactionTags';
 
 const DashboardScreen = ({ navigation }) => {
   const { debts, notifications, fetchData, logout, isLoading, user, updateDebt, deleteDebt, acceptDebt, declineDebt, restoreDebt, markNotificationsRead } = useStore();
 
   const [selectedDebt, setSelectedDebt] = useState(null);
   const [editAmount, setEditAmount] = useState('');
-  const [editNote, setEditNote] = useState('');
+  const [selectedTag, setSelectedTag] = useState(null);
+  const [editComment, setEditComment] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showPhoneModal, setShowPhoneModal] = useState(false);
   const [actingOnId, setActingOnId] = useState(null);
@@ -103,7 +105,9 @@ const DashboardScreen = ({ navigation }) => {
     }
     setSelectedDebt(debt);
     setEditAmount(debt.amount.toString());
-    setEditNote(debt.note || '');
+    const parsed = parseNoteTag(debt.note);
+    setSelectedTag(parsed.tag);
+    setEditComment(parsed.comment);
   };
 
   const handleUpdate = async () => {
@@ -114,13 +118,14 @@ const DashboardScreen = ({ navigation }) => {
     
     setIsSubmitting(true);
     try {
+      const finalNote = formatNoteWithTag(selectedTag, editComment);
       await updateDebt(selectedDebt.id, {
         debtorPhone: selectedDebt.debtor?.phoneNumber,
         creditorPhone: selectedDebt.creditor?.phoneNumber,
         debtorId: selectedDebt.debtor?.id,
         creditorId: selectedDebt.creditor?.id,
         amount: parseFloat(editAmount),
-        note: editNote
+        note: finalNote
       });
       setSelectedDebt(null);
       Alert.alert('Success', 'Transaction updated!');
@@ -455,14 +460,39 @@ const DashboardScreen = ({ navigation }) => {
                     />
                   </View>
 
-                  <Text style={styles.label}>Note</Text>
+                  <Text style={styles.label}>Category Tag (Optional)</Text>
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={styles.tagScroll}
+                  >
+                    {TRANSACTION_TAGS.map((t) => {
+                      const isSelected = selectedTag === t.id;
+                      return (
+                        <TouchableOpacity
+                          key={t.id}
+                          style={[styles.tagChip, isSelected && styles.tagChipActive]}
+                          onPress={() => setSelectedTag(isSelected ? null : t.id)}
+                          disabled={isSubmitting}
+                          activeOpacity={0.7}
+                        >
+                          <Text style={styles.tagIcon}>{t.icon}</Text>
+                          <Text style={[styles.tagText, isSelected && styles.tagTextActive]}>
+                            {t.label}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </ScrollView>
+
+                  <Text style={styles.label}>Comment / Note (Optional)</Text>
                   <View style={styles.inputContainer}>
                     <TextInput
                       style={styles.input}
-                      value={editNote}
-                      onChangeText={setEditNote}
+                      value={editComment}
+                      onChangeText={setEditComment}
                       editable={!isSubmitting}
-                      placeholder="Optional Note"
+                      placeholder={selectedTag ? `Details for ${selectedTag}...` : "Optional Note"}
                     />
                   </View>
 
@@ -827,6 +857,38 @@ const styles = StyleSheet.create({
   closeModalText: {
     color: Theme.colors.textSecondary,
     fontWeight: '600',
+  },
+  tagScroll: {
+    flexDirection: 'row',
+    paddingVertical: Theme.spacing.xs,
+    marginBottom: Theme.spacing.sm,
+  },
+  tagChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Theme.colors.surface,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: Theme.borderRadius.full,
+    borderWidth: 1,
+    borderColor: Theme.colors.border,
+    marginRight: 8,
+  },
+  tagChipActive: {
+    backgroundColor: Theme.colors.primary,
+    borderColor: Theme.colors.primary,
+  },
+  tagIcon: {
+    fontSize: 13,
+    marginRight: 5,
+  },
+  tagText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: Theme.colors.text,
+  },
+  tagTextActive: {
+    color: Theme.colors.white,
   },
 });
 
