@@ -12,6 +12,7 @@ import {
 } from 'lucide-react-native';
 
 import { APP_WEBSITE, APP_DOWNLOAD_LINK, joinGroupLink, qrImageUrl } from '../config/links';
+import { FEATURES } from '../config/features';
 
 const inviteLinkFor = (group) => joinGroupLink(group.joinCode);
 const qrUrl = qrImageUrl;
@@ -177,57 +178,61 @@ const AccountScreen = () => {
         </View>
 
         {/* ---------- Invite / Groups ---------- */}
-        <Text style={styles.sectionTitle}>Groups & Invite</Text>
-        <View style={styles.card}>
-          <View style={styles.chipRow}>
-            {groups.map((g) => {
-              const active = selectedGroup && g.id === selectedGroup.id;
-              return (
-                <TouchableOpacity key={g.id} style={[styles.chip, active && styles.chipActive]} onPress={() => setSelectedGroupId(g.id)}>
-                  <Text style={[styles.chipText, active && styles.chipTextActive]} numberOfLines={1}>{g.name}</Text>
+        {FEATURES.ENABLE_GROUPS && (
+          <>
+            <Text style={styles.sectionTitle}>Groups & Invite</Text>
+            <View style={styles.card}>
+              <View style={styles.chipRow}>
+                {groups.map((g) => {
+                  const active = selectedGroup && g.id === selectedGroup.id;
+                  return (
+                    <TouchableOpacity key={g.id} style={[styles.chip, active && styles.chipActive]} onPress={() => setSelectedGroupId(g.id)}>
+                      <Text style={[styles.chipText, active && styles.chipTextActive]} numberOfLines={1}>{g.name}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+                <TouchableOpacity style={[styles.chip, styles.chipGhost]} onPress={() => { setGroupInput(''); setGroupModal('create'); }}>
+                  <Plus size={14} color={Theme.colors.primary} />
+                  <Text style={[styles.chipText, { color: Theme.colors.primary, marginLeft: 4 }]}>New</Text>
                 </TouchableOpacity>
-              );
-            })}
-            <TouchableOpacity style={[styles.chip, styles.chipGhost]} onPress={() => { setGroupInput(''); setGroupModal('create'); }}>
-              <Plus size={14} color={Theme.colors.primary} />
-              <Text style={[styles.chipText, { color: Theme.colors.primary, marginLeft: 4 }]}>New</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={[styles.chip, styles.chipGhost]} onPress={() => { setGroupInput(''); setGroupModal('join'); }}>
-              <LogIn size={14} color={Theme.colors.primary} />
-              <Text style={[styles.chipText, { color: Theme.colors.primary, marginLeft: 4 }]}>Join</Text>
-            </TouchableOpacity>
-          </View>
-
-          {selectedGroup ? (
-            <View style={styles.groupBody}>
-              <Text style={styles.groupName}>{selectedGroup.name}</Text>
-              <View style={styles.codeBox}>
-                <Text style={styles.codeLabel}>Group code</Text>
-                <Text style={styles.codeValue}>{selectedGroup.joinCode}</Text>
-              </View>
-              <Image source={{ uri: qrUrl(inviteLinkFor(selectedGroup)) }} style={styles.qr} resizeMode="contain" />
-
-              <TouchableOpacity style={styles.waButton} onPress={() => inviteWhatsApp(selectedGroup)}>
-                <Share2 size={18} color={Theme.colors.white} />
-                <Text style={styles.waText}>Invite via WhatsApp</Text>
-              </TouchableOpacity>
-              <View style={styles.groupActions}>
-                <TouchableOpacity style={styles.secondaryBtn} onPress={() => shareCode(selectedGroup)}>
-                  <QrCode size={16} color={Theme.colors.text} />
-                  <Text style={styles.secondaryText}>Share code</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.secondaryBtn} onPress={() => confirmLeave(selectedGroup)}>
-                  <Text style={[styles.secondaryText, { color: Theme.colors.danger }]}>Leave</Text>
+                <TouchableOpacity style={[styles.chip, styles.chipGhost]} onPress={() => { setGroupInput(''); setGroupModal('join'); }}>
+                  <LogIn size={14} color={Theme.colors.primary} />
+                  <Text style={[styles.chipText, { color: Theme.colors.primary, marginLeft: 4 }]}>Join</Text>
                 </TouchableOpacity>
               </View>
+
+              {selectedGroup ? (
+                <View style={styles.groupBody}>
+                  <Text style={styles.groupName}>{selectedGroup.name}</Text>
+                  <View style={styles.codeBox}>
+                    <Text style={styles.codeLabel}>Group code</Text>
+                    <Text style={styles.codeValue}>{selectedGroup.joinCode}</Text>
+                  </View>
+                  <Image source={{ uri: qrUrl(inviteLinkFor(selectedGroup)) }} style={styles.qr} resizeMode="contain" />
+
+                  <TouchableOpacity style={styles.waButton} onPress={() => inviteWhatsApp(selectedGroup)}>
+                    <Share2 size={18} color={Theme.colors.white} />
+                    <Text style={styles.waText}>Invite via WhatsApp</Text>
+                  </TouchableOpacity>
+                  <View style={styles.groupActions}>
+                    <TouchableOpacity style={styles.secondaryBtn} onPress={() => shareCode(selectedGroup)}>
+                      <QrCode size={16} color={Theme.colors.text} />
+                      <Text style={styles.secondaryText}>Share code</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.secondaryBtn} onPress={() => confirmLeave(selectedGroup)}>
+                      <Text style={[styles.secondaryText, { color: Theme.colors.danger }]}>Leave</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              ) : (
+                <View style={styles.emptyBox}>
+                  <Users size={28} color={Theme.colors.textSecondary} />
+                  <Text style={styles.emptyText}>No groups yet. Create one to invite friends, or join with a code.</Text>
+                </View>
+              )}
             </View>
-          ) : (
-            <View style={styles.emptyBox}>
-              <Users size={28} color={Theme.colors.textSecondary} />
-              <Text style={styles.emptyText}>No groups yet. Create one to invite friends, or join with a code.</Text>
-            </View>
-          )}
-        </View>
+          </>
+        )}
 
         {/* ---------- Gamification ---------- */}
         <Text style={styles.sectionTitle}>Your Progress</Text>
@@ -323,27 +328,29 @@ const AccountScreen = () => {
       </Modal>
 
       {/* Create / Join group modal */}
-      <Modal visible={!!groupModal} transparent animationType="slide" onRequestClose={() => setGroupModal(null)}>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>{groupModal === 'create' ? 'Create a Group' : 'Join a Group'}</Text>
-            <Text style={styles.inputLabel}>{groupModal === 'create' ? 'Group name' : 'Join code'}</Text>
-            <TextInput
-              style={styles.input}
-              value={groupInput}
-              onChangeText={setGroupInput}
-              placeholder={groupModal === 'create' ? 'e.g. Goa Trip' : 'e.g. AB2C34'}
-              autoCapitalize={groupModal === 'create' ? 'words' : 'characters'}
-            />
-            <TouchableOpacity style={styles.saveBtn} onPress={submitGroup} disabled={groupBusy}>
-              {groupBusy ? <ActivityIndicator color={Theme.colors.white} /> : <Text style={styles.saveText}>{groupModal === 'create' ? 'Create' : 'Join'}</Text>}
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.cancelBtn} onPress={() => setGroupModal(null)}>
-              <Text style={styles.cancelText}>Cancel</Text>
-            </TouchableOpacity>
+      {FEATURES.ENABLE_GROUPS && (
+        <Modal visible={!!groupModal} transparent animationType="slide" onRequestClose={() => setGroupModal(null)}>
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <Text style={styles.modalTitle}>{groupModal === 'create' ? 'Create a Group' : 'Join a Group'}</Text>
+              <Text style={styles.inputLabel}>{groupModal === 'create' ? 'Group name' : 'Join code'}</Text>
+              <TextInput
+                style={styles.input}
+                value={groupInput}
+                onChangeText={setGroupInput}
+                placeholder={groupModal === 'create' ? 'e.g. Goa Trip' : 'e.g. AB2C34'}
+                autoCapitalize={groupModal === 'create' ? 'words' : 'characters'}
+              />
+              <TouchableOpacity style={styles.saveBtn} onPress={submitGroup} disabled={groupBusy}>
+                {groupBusy ? <ActivityIndicator color={Theme.colors.white} /> : <Text style={styles.saveText}>{groupModal === 'create' ? 'Create' : 'Join'}</Text>}
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.cancelBtn} onPress={() => setGroupModal(null)}>
+                <Text style={styles.cancelText}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
           </View>
-        </View>
-      </Modal>
+        </Modal>
+      )}
     </SafeAreaView>
   );
 };

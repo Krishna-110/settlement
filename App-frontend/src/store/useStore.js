@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import apiService from '../services/apiService';
 import authStorage from '../utils/authStorage';
 import { Alert } from 'react-native';
+import { FEATURES } from '../config/features';
 
 export const useStore = create((set, get) => ({
   persons: [],
@@ -80,7 +81,7 @@ export const useStore = create((set, get) => ({
         apiService.getSettlements(),
         apiService.getProfile(),
         apiService.getNotifications().catch(() => []),
-        apiService.getGroups().catch(() => []),
+        FEATURES.ENABLE_GROUPS ? apiService.getGroups().catch(() => []) : Promise.resolve([]),
         apiService.getGamification().catch(() => null),
       ]);
       set({

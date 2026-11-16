@@ -5,6 +5,7 @@ import { useStore } from '../store/useStore';
 import { Theme } from '../theme/Theme';
 import { Save, UserCircle, ChevronDown, Paperclip, UserPlus } from 'lucide-react-native';
 import { TRANSACTION_TAGS, formatNoteWithTag } from '../utils/transactionTags';
+import { FEATURES } from '../config/features';
 
 const AddDebtScreen = ({ navigation }) => {
   const { persons, groups, addDebt, fetchData, user } = useStore();
@@ -190,7 +191,7 @@ const AddDebtScreen = ({ navigation }) => {
             />
           </View>
 
-          {groups.length > 0 && (
+          {FEATURES.ENABLE_GROUPS && groups.length > 0 && (
             <>
               <Text style={styles.label}>Group (optional)</Text>
               <View style={styles.groupChips}>

@@ -18,6 +18,7 @@ import ManagePersonsScreen from './src/screens/ManagePersonsScreen';
 import HistoryScreen from './src/screens/HistoryScreen';
 import AccountScreen from './src/screens/AccountScreen';
 import FirstLaunchNotice from './src/components/FirstLaunchNotice';
+import { FEATURES } from './src/config/features';
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
@@ -164,7 +165,7 @@ export default function App() {
 
   // 3. Once signed in, redeem any invite code that came in from a deep link.
   useEffect(() => {
-    if (!isAuthenticated || !pendingJoinCode) return;
+    if (!FEATURES.ENABLE_GROUPS || !isAuthenticated || !pendingJoinCode) return;
     let cancelled = false;
 
     (async () => {
